@@ -13,7 +13,7 @@ cd uptime-kuma
 sleep 3
 
 # Download the yml file to the current directory
-curl -o docker-compose.yml https://raw.githubusercontent.com/Vichondrias1/lponder/main/docker-compose.yml
+curl -o docker-compose.yml https://raw.githubusercontent.com/Vichondrias1/lponder/65dc6a23a5ab663d5488075133a8ce109276ebf5/Uptime-Kuma/docker-compose.yml
 
 # Execute the yml file
 docker compose up
