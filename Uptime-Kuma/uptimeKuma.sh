@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Create the directory with appropriate permissions
-sudo mkdir -p /uptime-kuma
+sudo mkdir uptime-kuma
 
 # Change ownership of the directory to the current user
-sudo chown $(whoami):$(whoami) /uptime-kuma
+sudo chown $(whoami):$(whoami) uptime-kuma
 
 # Navigate to the directory
-cd /uptime-kuma
+cd uptime-kuma
 
 # Pause for 3 seconds
 sleep 3
@@ -16,4 +16,4 @@ sleep 3
 curl -o docker-compose.yml https://raw.githubusercontent.com/Vichondrias1/lponder/main/docker-compose.yml
 
 # Execute the yml file
-docker-compose up
+docker compose up
