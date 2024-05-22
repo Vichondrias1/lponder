@@ -3,7 +3,7 @@
 #tried but doesnt work wtff haha!!!
 #sudo mkdir uptime-kuma && cd uptime-kuma
 
-sudo mkdir /uptime-kuma
+sudo mkdir uptime-kuma
 
 #download the yml file to the current directory
 curl -o /uptime-kuma/docker-compose.yml https://raw.githubusercontent.com/Vichondrias1/lponder/main/docker-compose.yml
