@@ -13,7 +13,7 @@ cd stirling-pdf
 sleep 3
 
 # Download the yml file to the current directory
-curl -o docker-compose.yml https://raw.githubusercontent.com/Vichondrias1/lponder/main/stirling-pdf/docker-compose.yml
+curl -o docker-compose.yml https://raw.githubusercontent.com/Vichondrias1/lponder/main/Stirling-PDF/docker-compose.yml
 
 # Execute the yml file
 docker compose up
