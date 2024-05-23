@@ -15,4 +15,3 @@ services:
       - TS_AUTHKEY=${tailscaleAuthkey}
       - TS_ACCEPTROUTER=1
       - TS_SUBNET_ROUTES=1
-    entrypoint: /bin/sh -c "echo 'Please enter authkey';read $authkey;export tailscaleAuthkey=$authkey;echo 'authkey provided $authkey';"
