@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: lponder_nginx
+    ports:
+      - "81:80" #<Host Port>:<Container Port> 
+    restart: always
