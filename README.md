@@ -1,4 +1,4 @@
-                                     ![lponderlogo](/logo/logo.png)
+                                        ![lpondergroup](logo/logo.png)
 # Welcome to LponderGroup!
 
 Welcome to the Quick Start Guide for Downloading and Running Popular Self-Hosted Applications with Curl Commands!
