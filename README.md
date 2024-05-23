@@ -38,7 +38,7 @@ See official documentation of <a href="https://nginx.org/en/docs/" target="_blan
     curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Nginx/nginx.sh | sh
 
 # Tailscale
-See official documentation of <a href="https://nginx.org/en/docs/" target="_blank">Nginx</a> here.
+See official documentation of <a href="https://tailscale.com/kb" target="_blank">Tailscale</a> here.
 
     export tailscaleAuthkey = {Your Authkey Here}
     curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Tailscale/tailscale.sh | sh    
