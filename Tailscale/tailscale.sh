@@ -9,14 +9,6 @@ sudo chown $(whoami):$(whoami) tailscale
 # Navigate to the directory
 cd tailscale
 
-# Loop until the authkey is provided
-while [ -z "$authkey" ]; do
-  echo "Please provide the Tailscale authkey:"
-  read authkey
-done
-
-export tailscaleAuthkey=$authkey
-
 # Download the yml file to the current directory
 curl -o docker-compose.yml https://raw.githubusercontent.com/Vichondrias1/lponder/main/Tailscale/docker-compose.yml
 

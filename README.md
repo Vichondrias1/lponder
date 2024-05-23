@@ -9,7 +9,8 @@ In this guide, we will cover the essential curl commands to download and run the
 2.  **Pi-Hole**
 3.  **Dashy**
 4.  **Stirling PDF**
-4.  **Nginx**
+5.  **Nginx**
+6.  **Tailscale**
 
 # Uptime Kuma
 See official documentation of <a href="https://github.com/louislam/uptime-kuma" target="_blank">Uptime Kuma</a> here.
@@ -35,4 +36,12 @@ See official documentation of <a href="https://stirlingtools.com/docs/Overview/W
 See official documentation of <a href="https://nginx.org/en/docs/" target="_blank">Nginx</a> here.
 
     curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Nginx/nginx.sh | sh
+
+# Tailscale
+See official documentation of <a href="https://nginx.org/en/docs/" target="_blank">Nginx</a> here.
+
+    export tailscaleAuthkey={Your Authkey Here}
+    curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Nginx/nginx.sh | sh    
+
+
 
