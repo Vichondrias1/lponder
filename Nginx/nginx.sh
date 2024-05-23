@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Create the directory with appropriate permissions
-sudo mkdir dashy
+sudo mkdir nginx
 
 # Change ownership of the directory to the current user
-sudo chown $(whoami):$(whoami) dashy
+sudo chown $(whoami):$(whoami) nginx
 
 # Navigate to the directory
-cd dashy
+cd nginx
 
 # Pause for 3 seconds
 sleep 3
