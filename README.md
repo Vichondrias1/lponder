@@ -40,7 +40,6 @@ See the official documentation of <a href="https://nginx.org/en/docs/" target="_
 # Tailscale
 See the official documentation of <a href="https://tailscale.com/kb" target="_blank">Tailscale</a> here.
 
-    export tailscaleAuthkey = {Your Authkey Here}
 
   1. Generate the auth key from [tailscale](https://login.tailscale.com/admin/settings/keys) . (Note: Do not include the curly brace)
 
