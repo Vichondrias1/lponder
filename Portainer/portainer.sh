@@ -13,7 +13,7 @@ cd portainer
 sleep 3
 
 # Download the yml file to the current directory
-curl -o docker-compose.yml https://raw.githubusercontent.com/Vichondrias1/lponder/main/Portainer/portainer.sh
+curl -o docker-compose.yml https://raw.githubusercontent.com/Vichondrias1/lponder/main/Portainer/docker-compose.yml
 
 # Execute the yml file
 docker compose up

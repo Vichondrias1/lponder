@@ -41,12 +41,15 @@ See the official documentation of <a href="https://nginx.org/en/docs/" target="_
 # Tailscale
 See the official documentation of <a href="https://tailscale.com/kb" target="_blank">Tailscale</a> here.
 
+  1. Use this command to install tailscale on your device.
 
-  1. Generate the auth key from [tailscale](https://login.tailscale.com/admin/settings/keys) . (Note: Do not include the curly brace)
+    curl -fsSL https://tailscale.com/install.sh | sh
+
+  2. Generate the auth key from [tailscale](https://login.tailscale.com/admin/settings/keys) . (Note: Do not include the curly brace)
 
     export tailscaleAuthkey={Your Authkey Here}
 
-  2. Run the curl command.
+  3. Run the curl command.
 
     curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Tailscale/tailscale.sh | sh  
 
