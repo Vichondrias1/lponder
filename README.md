@@ -11,6 +11,7 @@ In this guide, we will cover the essential curl commands to download and run the
 4.  **Stirling PDF**
 5.  **Nginx**
 6.  **Tailscale**
+7.  **Portainer**
 
 # Uptime Kuma
 See the official documentation of <a href="https://github.com/louislam/uptime-kuma" target="_blank">Uptime Kuma</a> here.
@@ -48,6 +49,11 @@ See the official documentation of <a href="https://tailscale.com/kb" target="_bl
   2. Run the curl command.
 
     curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Tailscale/tailscale.sh | sh  
+
+# Portainer
+See the official documentation of <a href="https://docs.portainer.io/" target="_blank">Portainer</a> here.
+
+    curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Portainer/portainer.sh | sh
 
 
 
