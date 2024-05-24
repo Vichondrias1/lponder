@@ -43,7 +43,7 @@ See the official documentation of <a href="https://tailscale.com/kb" target="_bl
 
   1. Generate the auth key from [tailscale](https://login.tailscale.com/admin/settings/keys) . (Note: Do not include the curly brace)
 
-    export tailscaleAuthkey = {Your Authkey Here}
+    export tailscaleAuthkey={Your Authkey Here}
 
   2. Run the curl command.
 
