@@ -12,6 +12,7 @@ In this guide, we will cover the essential curl commands to download and run the
 5.  **Nginx**
 6.  **Tailscale**
 7.  **Portainer**
+8.  **Nginx Proxy Manager**
 
 # Uptime Kuma
 See the official documentation of <a href="https://github.com/louislam/uptime-kuma" target="_blank">Uptime Kuma</a> here.
@@ -57,6 +58,11 @@ See the official documentation of <a href="https://tailscale.com/kb" target="_bl
 See the official documentation of <a href="https://docs.portainer.io/" target="_blank">Portainer</a> here.
 
     curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Portainer/portainer.sh | sh
+
+# Nginx Proxy Manager
+See the official documentation of <a href="https://nginxproxymanager.com/guide/" target="_blank">Nginx Proxy Manager</a> here.
+
+    curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Nginx-Proxy-Manager/nginxProxyManager.sh | sh
 
 
 
