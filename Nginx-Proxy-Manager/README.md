@@ -49,6 +49,6 @@ See the official documentation of <a  href="https://nginxproxymanager.com/guide/
 
 
 # Setup Reverse Proxy and TSL Certificate
-This video shows how to reverse proxy your created duckdns domain name to your localhost applications and genenate a TLS or SSL certicate.
+This video shows how to reverse proxy your created duckdns domain name to your localhost applications and genenate a TLS or SSL certicate. <a href="../img/Duck-DNS.mp4">(Download Video Here.)</a>
 
 <video controls src="../img/Duck-DNS.mp4" title="Title"></video>
