@@ -5,6 +5,7 @@ services:
     container_name: nginxproxymanager
     restart: unless-stopped 
     ports:
+      - '443:443'
       - '82:81'
     volumes:
       - ./nginx/data:/data
