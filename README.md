@@ -60,7 +60,9 @@ See the official documentation of <a href="https://docs.portainer.io/" target="_
     curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Portainer/portainer.sh | sh
 
 # Nginx Proxy Manager
-See the official documentation of <a href="https://nginxproxymanager.com/guide/" target="_blank">Nginx Proxy Manager</a> here.
+See the official documentation of <a href="https://nginxproxymanager.com/guide/" target="_blank">Nginx Proxy Manager</a> here. 
+
+Read the <a href="/Nginx-Proxy-Manager/README.md">Readme.md</a> on how to setup nginx proxy manager on your local machine.
 
     curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Nginx-Proxy-Manager/nginxProxyManager.sh | sh
 
