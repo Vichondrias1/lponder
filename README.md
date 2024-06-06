@@ -14,6 +14,18 @@ In this guide, we will cover the essential curl commands to download and run the
 7.  **Portainer**
 8.  **Nginx Proxy Manager**
 
+# Default Ports
+The list of ports to access the applications.
+
+|Name|Port Number  |
+|--|--|
+|Uptime Kuma  | 3001 |
+|Pi-Hole  | 84 |
+|Dashy  | 4000 |
+|Stirling PDF  | 3001 |
+|Portainer  | 9000|
+|Nginx Proxy Manager  | 82|
+
 # Uptime Kuma
 See the official documentation of <a href="https://github.com/louislam/uptime-kuma" target="_blank">Uptime Kuma</a> here.
 

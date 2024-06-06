@@ -15,9 +15,8 @@ Default Ports:
 3.  **Dashy : Port 4000**
 4.  **Stirling PDF : Port 8081**
 5.  **Nginx : Port 81**
-6.  **Tailscale : Port 35**
-7.  **Portainer : Port 900**
-8.  **Nginx Proxy Manager : Port 82**
+6.  **Portainer : Port 9000**
+7.  **Nginx Proxy Manager : Port 82**
 
   
 
