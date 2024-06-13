@@ -78,5 +78,11 @@ Read the <a href="/Nginx-Proxy-Manager/README.md">Readme.md</a> on how to setup 
 
     curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Nginx-Proxy-Manager/nginxProxyManager.sh | sh
 
+# Cups Network Printer (For Brother Printer)
+See the official documentation of <a href="https://www.cups.org/documentation" target="_blank">CUPS</a> here.  (Note that this is only for linux based operating system like Rasberry PI.)
+
+
+    curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Raspberry-Pi-Network-Printer/networkPrinter.sh | sh    
+
 
 
