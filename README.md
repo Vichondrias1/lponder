@@ -86,24 +86,30 @@ See the official documentation of <a href="https://www.cups.org/documentation" t
 
     curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Raspberry-Pi-Network-Printer/networkPrinter.sh | sh    
 
-Step 1: Open the Raspberry PI.
+**Step 1: Open the Raspberry PI.**
 
-Step 2: Access the CUPS Web Interface
+**Step 2: Access the CUPS Web Interface**
+
 Open a web browser and navigate to http://localhost:631.
 
-Step 3: Log in to the Administration Tab
+**Step 3: Log in to the Administration Tab**
+
 Click on the "Administration" tab. You will be prompted to enter your username and password.
 
-Step 4: Add a Printer
+**Step 4: Add a Printer**
+
 Click on "Add Printer" and select your local printer from the list. Click "Continue".
 
-Step 5: Configure Printer Settings
+**Step 5: Configure Printer Settings**
+
 Enter a desired name and description for your printer. Make sure to check the box next to "Share This Printer". Click "Continue".
 
-Step 6: Select Printer Make and Model
+**Step 6: Select Printer Make and Model**
+
 Select the make and model of your printer from the list. Click "Add Printer" to complete the setup.
 
-Step 7: Test the Print Server
+**Step 7: Test the Print Server**
+
 To test the print server, add the printer on another computer and print a test page.
 
 By following these steps, you should be able to successfully add a printer to your CUPS print server and print a test page from another computer.
