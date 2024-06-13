@@ -13,6 +13,7 @@ In this guide, we will cover the essential curl commands to download and run the
 6.  **Tailscale**
 7.  **Portainer**
 8.  **Nginx Proxy Manager**
+9.  **Cups Network Printer**
 
 # Default Ports
 The list of ports to access the applications.
@@ -25,6 +26,7 @@ The list of ports to access the applications.
 |Stirling PDF  | 3001 |
 |Portainer  | 9000|
 |Nginx Proxy Manager  | 82|
+|Cups Network Printer  | 631|
 
 # Uptime Kuma
 See the official documentation of <a href="https://github.com/louislam/uptime-kuma" target="_blank">Uptime Kuma</a> here.
