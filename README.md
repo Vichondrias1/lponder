@@ -84,7 +84,7 @@ Read the <a href="/Nginx-Proxy-Manager/README.md">Readme.md</a> on how to setup 
 See the official documentation of <a href="https://www.cups.org/documentation" target="_blank">CUPS</a> here.  (Note that this is only for linux based operating system like Rasberry PI.) Run this curl command and then follow the steps on how to setup the printer to the network.
 
 
-    1. export IP={Provide Your Ip Here}    
+    1. export IP="Provide Your Ip Range Here"
 
     2. curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Raspberry-Pi-Network-Printer/networkPrinter.sh | sh      
 
