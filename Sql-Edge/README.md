@@ -1,31 +1,90 @@
 # Install SQL EDGE using Docker
-See the official documentation of <a href="https://linux.die.net/man/1/rsync" target="_blank">Rsync</a> here.
+See the official documentation of <a href="https://learn.microsoft.com/en-us/azure/azure-sql-edge/disconnected-deployment" target="_blank">SQL Edge on Docker</a> here.
 
-**Step 1: Pull and run the container image**
+**Run this command to download and run the docker compose file**
 
-(In this example I use my Deca PC as the Source path and the pi-Lab as the destination path)
-![alt text](<../img/tailscale ip.PNG>)
+    curl -sL https://raw.githubusercontent.com/Vichondrias1/lponder/main/Sql-Edge/sqlEdge.sh | sh 
 
-**Step 2: Create a folder on your destination path.**
-You need to create a folder on your NAS to point it on the Destination Path and run this commands .
+# Docker Container Name
+Note that **azuresqledge** is the docker container name (you can check the docker-compose.yml)
 
-    #Connect to your NAS
-    ssh [NAS Username]@[Nas Tailscale IP]
+# Connect to Azure SQL Edge
 
-    # Create the directory /home/admin/rsync with superuser privileges.
-    sudo mkdir /home/admin/rsync
+The following steps use the Azure SQL Edge command-line tool, sqlcmd, inside the container to connect to SQL Edge.
 
-    # Change the ownership of the /home/admin/rsync directory to user 'admin' and group 'admin'.
-    sudo chown admin:admin /home/admin/rsync
+1. Use the docker exec -it command to start an interactive bash shell inside your running container. In the following example, azuresqledge is the name specified by the --name parameter when you created the container.
 
-    # Add write permissions for the user 'admin' to the /home/admin/rsync directory.
-    sudo chmod u+w /home/admin/rsync
+        sudo docker exec -it azuresqledge "bash"
+
+2. Once inside the container, connect locally with sqlcmd. sqlcmd isn't in the path by default, so you have to specify the full path.
+
+        /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'YourStrong!Passw0rd'
+
+3. If successful, you should get to a sqlcmd command prompt: 1>.
+
+# Create a new database
+
+The following steps create a new database named legacy.
+
+1. From the sqlcmd command prompt, paste the following Transact-SQL command to create a test database:
+
+        CREATE DATABASE Legacy;
+        GO
+
+2. On the next line, write a query to return the name of all of the databases on your server:
+
+        SELECT name from sys.databases;
+        GO
+
+# Restore Database
+
+**Step 1: Ensure You Have the Backup File**
+
+Make sure you have your legacy.bak or any database .bak file ready.
+
+**Step 2: Copy the Backup File to the Docker Container**
+
+    docker cp C:/Users/Liam/Downloads/legacy.bak azuresqledge:/var/opt/mssql/data/legacy.bak
+
+**Step 3: Connect to the SQL Edge Instance:**
+
+    docker exec -it azuresqledge /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong!Passw0rd'
+
+**Step 4: Find Logical File Names:** 
+
+Run the following command to get the logical file names:
+
+    RESTORE FILELISTONLY
+    FROM DISK = '/var/opt/mssql/data/legacy.bak';
+    GO
+
+This command returns a list of the logical file names in the backup. Take note of the logical names, which you will use in the restore command.
+
+**Step 5: Restore the Database:**
+
+Use the logical file names you found in the previous step in the following restore command. For example, let's assume the logical file names are Legacy and legacy_Log.
+
+    RESTORE DATABASE legacy
+    FROM DISK = '/var/opt/mssql/data/legacy.bak'
+    WITH MOVE 'Legacy' TO '/var/opt/mssql/data/Legacy_Primary.mdf',
+        MOVE 'Legacy_log' TO '/var/opt/mssql/data/Legacy_Primary.ldf';
+    GO
+
+# Connect To Azure Data Studio
+Make sure that the Azure Data Studio is already installed. Click here to install <a href="https://learn.microsoft.com/en-us/azure-data-studio/download-azure-data-studio?view=sql-server-ver16&tabs=win-install%2Cwin-user-install%2Credhat-install%2Cwindows-uninstall%2Credhat-uninstall" target="_blank">Azure Data Studio</a>.
+
+Server: localhost
+
+User: sa
+
+Password: YourStrong!Passw0rd
+
+![alt text](../img/azure-data-studio.gif)
 
 
-**Step 3: Run this command.**
 
 
 
-     sudo rsync -av [Source Path] [Destination Username]@[Tailscale Ip]:[Destination Path]
 
-     Example: sudo rsync -av /mnt/c/Users/paqui/Downloads/Rsync-Sample-Data admin@100.70.95.78:/home/admin/Rsync-Folder
+
+
