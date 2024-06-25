@@ -81,6 +81,90 @@ Password: YourStrong!Passw0rd
 
 ![alt text](../img/azure-data-studio.gif)
 
+# Create Master Key And Certificate. (Run this on Azure Data Studio)
+
+    USE master;
+    GO
+
+	CREATE MASTER KEY ENCRYPTION BY PASSWORD = 't35tTDE';
+	GO
+
+	CREATE CERTIFICATE TDETestCert WITH SUBJECT = 'TDE Test DEK Certificate';
+	GO
+
+# Apply Encryption to your database. (Run this on Azure Data Studio)
+
+	USE TDE_Test_Database;
+	GO
+
+	CREATE DATABASE ENCRYPTION KEY
+	WITH ALGORITHM = AES_256
+	ENCRYPTION BY SERVER CERTIFICATE TDETestCert;
+	GO
+
+	ALTER DATABASE TDE_Test_Database
+	SET ENCRYPTION ON;
+	GO
+
+
+
+# Back Up your SERVICE/MASTER KEY and CERTIFICATE (Run this on Azure Data Studio)
+	
+	USE master
+	GO
+
+	BACKUP SERVICE MASTER KEY TO FILE = N'\var\Service_Master_Key.key'
+	ENCRYPTION BY PASSWORD = N's37v1(3';
+ 
+	BACKUP MASTER KEY TO FILE = N'C:\Users\Developer24\Desktop\Work\DBA Tools\TDE Test\Master_Key.key'
+	ENCRYPTION BY PASSWORD = N'm@5t37';
+ 
+	BACKUP CERTIFICATE TDETestCert 
+	TO FILE = N'C:\Users\Developer24\Desktop\Work\DBA Tools\TDE Test\TDETestCert.cert'
+	WITH PRIVATE KEY (
+    	FILE = N'C:\Users\Developer24\Desktop\Work\DBA Tools\TDE Test\TDETestCert.key'
+    	, ENCRYPTION BY PASSWORD = N'=(37t1f1(@t3'
+    	);
+
+
+**To Copy the Keys From your Docker Container to Your Device RUN (Run this on your terminal)**
+
+	sudo docker cp <containername>:path/to/your/keys path/to/your/destination
+	
+	ex: docker cp azuresqledge:/var/opt/mssql/data/keys home/liam/documents/ 
+
+
+# Restore Database with TDE to Another Server/Computer
+
+	USE master;
+	GO
+
+	-- Check if you have already a master key on the master database.
+	-- ##MS_DatabaseMasterKey##
+	SELECT * FROM sys.symmetric_keys;
+
+	-- If no master key exists yet create one
+	USE master;
+	GO
+
+	CREATE MASTER KEY ENCRYPTION
+	BY PASSWORD = 'masterK37';
+	GO
+
+	-- In the master database, restore certificate using backukp file and private key
+
+	USE master;
+	GO
+
+	CREATE CERTIFICATE TDECert
+	FROM FILE = 'home/liam/documents/keys/TDETestCert.cert'
+	WITH PRIVATE KEY (FILE = N'home/liam/documents/keys/TDETestCert.key',
+	DECRYPTION BY PASSWORD = '=(37t1f1(@t3'); 
+	GO
+
+(NOTE: YOU NEED TO MAKE SURE YOUR PASSWORD MATCHES WITH THE ONE YOU USED IN ENCRYPTION(Step 3: BACKUP CERTIFICATE) TO AVOID ERROR)
+
+
 
 
 
