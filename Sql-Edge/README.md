@@ -67,7 +67,7 @@ Use the logical file names you found in the previous step in the following resto
     RESTORE DATABASE legacy
     FROM DISK = '/var/opt/mssql/data/legacy.bak'
     WITH MOVE 'Legacy' TO '/var/opt/mssql/data/Legacy_Primary.mdf',
-        MOVE 'Legacy_log' TO '/var/opt/mssql/data/Legacy_Primary.ldf';
+    MOVE 'Legacy_log' TO '/var/opt/mssql/data/Legacy_Primary.ldf';
     GO
 
 # Connect To Azure Data Studio
