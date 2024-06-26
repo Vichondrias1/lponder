@@ -86,15 +86,23 @@ Password: YourStrong!Passw0rd
     USE master;
     GO
 
-	CREATE MASTER KEY ENCRYPTION BY PASSWORD = 't35tTDE';
+	CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'YourStrong!Passw0rd';
 	GO
 
 	CREATE CERTIFICATE TDETestCert WITH SUBJECT = 'TDE Test DEK Certificate';
 	GO
 
+This script is designed to be run in Azure Data Studio, targeting a SQL Server database. Here’s a straightforward explanation of what each part does:
+
+|Command|Usage|
+|--|--|
+|CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'YourStrong!Passw0rd' | Creates a master key in the database. This master key is encrypted by the specified password ('YourStrong!Passw0rd'). The    master key is a symmetric key used to secure other keys in the database.|
+|CREATE CERTIFICATE TDETestCert WITH SUBJECT = 'TDE Test DEK Certificate'| Creates a certificate named TDETestCert in the master database with the subject 'TDE Test DEK Certificate'. This certificate will be used later for encryption purposes, such as Transparent Data Encryption (TDE).|
+
+
 # Apply Encryption to your database. (Run this on Azure Data Studio)
 
-	USE TDE_Test_Database;
+	USE <Your Database Name>;
 	GO
 
 	CREATE DATABASE ENCRYPTION KEY
@@ -102,30 +110,56 @@ Password: YourStrong!Passw0rd
 	ENCRYPTION BY SERVER CERTIFICATE TDETestCert;
 	GO
 
-	ALTER DATABASE TDE_Test_Database
+	ALTER DATABASE <Your Database Name>
 	SET ENCRYPTION ON;
 	GO
 
+This script is intended to apply Transparent Data Encryption (TDE) to a specific database using Azure Data Studio. Here’s a straightforward explanation of what each part does.
 
+|Command|Usage|
+|--|--|
+|CREATE DATABASE ENCRYPTION KEY | Creates a database encryption key for <Your Database Name>.|
+|WITH ALGORITHM = AES_256 | Specifies that the encryption algorithm to use is AES_256, which is a strong encryption standard.|
+|ENCRYPTION BY SERVER CERTIFICATE TDETestCert | Specifies that the encryption key should be encrypted by the certificate TDETestCert that was created in the previous steps.|
+|ALTER DATABASE <Your Database Name> SET ENCRYPTION ON | Turns on encryption for the <Your Database Name>. This command enables Transparent Data Encryption (TDE) for the database, encrypting the data at rest.|
 
 # Back Up your SERVICE/MASTER KEY and CERTIFICATE (Run this on Azure Data Studio)
 	
 	USE master
 	GO
 
-	BACKUP SERVICE MASTER KEY TO FILE = N'\var\Service_Master_Key.key'
-	ENCRYPTION BY PASSWORD = N's37v1(3';
+	BACKUP SERVICE MASTER KEY TO FILE = N'\var\opt\mssql\data\keys\Service_Master_Key.key'
+	ENCRYPTION BY PASSWORD = N'YourStrong!Passw0rd1';
  
-	BACKUP MASTER KEY TO FILE = N'C:\Users\Developer24\Desktop\Work\DBA Tools\TDE Test\Master_Key.key'
-	ENCRYPTION BY PASSWORD = N'm@5t37';
+	BACKUP MASTER KEY TO FILE = N'\var\opt\mssql\data\keys\Master_Key.key'
+	ENCRYPTION BY PASSWORD = N'YourStrong!Passw0rd2';
  
 	BACKUP CERTIFICATE TDETestCert 
-	TO FILE = N'C:\Users\Developer24\Desktop\Work\DBA Tools\TDE Test\TDETestCert.cert'
+	TO FILE = N'\var\opt\mssql\data\keys\TDETestCert.cert'
 	WITH PRIVATE KEY (
-    	FILE = N'C:\Users\Developer24\Desktop\Work\DBA Tools\TDE Test\TDETestCert.key'
-    	, ENCRYPTION BY PASSWORD = N'=(37t1f1(@t3'
+    	FILE = N'\var\opt\mssql\data\keys\TDETestCert.key'
+    	, ENCRYPTION BY PASSWORD = N'YourStrong!Passw0rd3'
     	);
 
+This script backs up the service master key, the master key, and the certificate used for Transparent Data Encryption (TDE). Here's a straightforward explanation of what each part does
+
+|Command|Usage|
+|--|--|
+|BACKUP SERVICE MASTER KEY| Backs up the service master key to a file.|
+|TO FILE = N'\var\opt\mssql\data\keys\Service_Master_Key.key' | Specifies the file path where the service master key will be saved.|
+|ENCRYPTION BY PASSWORD = N'YourStrong!Passw0rd1'| Specifies the password to encrypt the service master key backup file.|
+
+|Command|Usage|
+|--|--|
+|BACKUP MASTER KEY | Backs up the database master key to a file.|
+|TO FILE = N'\var\opt\mssql\data\keys\Master_Key.key'|Specifies the file path where the master key will be saved.|
+|ENCRYPTION BY PASSWORD = N'YourStrong!Passw0rd2'|Specifies the password to encrypt the master key backup file.|
+
+|Command|Usage|
+|--|--|
+|BACKUP CERTIFICATE TDETestCert|Backs up the certificate TDETestCert to a file.|
+|TO FILE = N'\var\opt\mssql\data\keys\TDETestCert.cert'|Specifies the file path where the certificate will be saved.|
+|WITH PRIVATE KEY (FILE = N'\var\opt\mssql\data\keys\TDETestCert.key', ENCRYPTION BY PASSWORD = N'YourStrong!Passw0rd3'|Specifies the file path where the private key will be saved and the password to encrypt the private key backup file.|
 
 **To Copy the Keys From your Docker Container to Your Device RUN (Run this on your terminal)**
 
@@ -136,39 +170,38 @@ Password: YourStrong!Passw0rd
 
 # Restore Database with TDE to Another Server/Computer
 
+Verify first if you already have a master key.
+
 	USE master;
 	GO
 
 	-- Check if you have already a master key on the master database.
 	-- ##MS_DatabaseMasterKey##
-	SELECT * FROM sys.symmetric_keys;
+		SELECT * FROM sys.symmetric_keys;
 
-	-- If no master key exists yet create one
+If you dont have a master key you can create one using the command below:
+
 	USE master;
 	GO
 
 	CREATE MASTER KEY ENCRYPTION
 	BY PASSWORD = 'masterK37';
 	GO
+	
 
-	-- In the master database, restore certificate using backukp file and private key
+In the master database, restore certificate using backup file and private key
 
 	USE master;
 	GO
 
 	CREATE CERTIFICATE TDECert
-	FROM FILE = 'home/liam/documents/keys/TDETestCert.cert'
-	WITH PRIVATE KEY (FILE = N'home/liam/documents/keys/TDETestCert.key',
-	DECRYPTION BY PASSWORD = '=(37t1f1(@t3'); 
+	FROM FILE = '<path>/TDETestCert.cert'
+	WITH PRIVATE KEY (FILE = N'<path>/TDETestCert.key',
+	DECRYPTION BY PASSWORD = 'YourStrong!Passw0rd3'); 
 	GO
 
-(NOTE: YOU NEED TO MAKE SURE YOUR PASSWORD MATCHES WITH THE ONE YOU USED IN ENCRYPTION(Step 3: BACKUP CERTIFICATE) TO AVOID ERROR)
-
-
-
-
-
-
-
-
-
+|Command|Usage|
+|--|--|
+|CREATE CERTIFICATE TDECert|Restores a certificate named TDECert|
+|FROM FILE = '<path>/TDETestCert.cert'|Specifies the file path where the certificate backup file is located.|
+|WITH PRIVATE KEY (FILE = N'<path>/TDETestCert.key', DECRYPTION BY PASSWORD = 'YourStrong!Passw0rd3')|Specifies the file path where the private key backup file is located and the password to decrypt the private key. (The password must match the one used during the backup process to avoid errors.) |

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   sql1:
     image: mcr.microsoft.com/azure-sql-edge
