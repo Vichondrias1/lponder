@@ -1,3 +1,7 @@
+# Table Of Contents
+- [Table Of Contents](#table-of-contents)
+- [Copy file from server to NAS using rsync](#copy-file-from-server-to-nas-using-rsync)
+
 # Copy file from server to NAS using rsync
 See the official documentation of <a href="https://linux.die.net/man/1/rsync" target="_blank">Rsync</a> here.
 

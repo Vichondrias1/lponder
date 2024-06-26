@@ -1,4 +1,22 @@
- ![LponderGroup](logo/logo.png)
+
+
+![LponderGroup](logo/logo.png)
+
+# Table Of Contents
+
+- [Table Of Contents](#table-of-contents)
+- [Welcome to LponderGroup!](#welcome-to-lpondergroup)
+- [Default Ports](#default-ports)
+- [Uptime Kuma](#uptime-kuma)
+- [Pi-Hole](#pi-hole)
+- [Dashy](#dashy)
+- [Stirling PDF](#stirling-pdf)
+- [Nginx](#nginx)
+- [Tailscale](#tailscale)
+- [Portainer](#portainer)
+- [Nginx Proxy Manager](#nginx-proxy-manager)
+- [Cups Network Printer (For Brother Printer)](#cups-network-printer-for-brother-printer)
+
 # Welcome to LponderGroup!
 
 Welcome to the Quick Start Guide for Downloading and Running Popular Self-Hosted Applications with Curl Commands!

@@ -1,3 +1,17 @@
+
+# Table Of Contents
+- [Table Of Contents](#table-of-contents)
+- [Install SQL EDGE using Docker](#install-sql-edge-using-docker)
+- [Docker Container Name](#docker-container-name)
+- [Connect to Azure SQL Edge](#connect-to-azure-sql-edge)
+- [Create a new database](#create-a-new-database)
+- [Restore Database](#restore-database)
+- [Connect To Azure Data Studio](#connect-to-azure-data-studio)
+- [Create Master Key And Certificate. (Run this on Azure Data Studio)](#create-master-key-and-certificate-run-this-on-azure-data-studio)
+- [Apply Encryption to your database. (Run this on Azure Data Studio)](#apply-encryption-to-your-database-run-this-on-azure-data-studio)
+- [Back Up your SERVICE/MASTER KEY and CERTIFICATE (Run this on Azure Data Studio)](#back-up-your-servicemaster-key-and-certificate-run-this-on-azure-data-studio)
+- [Restore Database with TDE to Another Server/Computer](#restore-database-with-tde-to-another-servercomputer)
+
 # Install SQL EDGE using Docker
 See the official documentation of <a href="https://learn.microsoft.com/en-us/azure/azure-sql-edge/disconnected-deployment" target="_blank">SQL Edge on Docker</a> here.
 
