@@ -5,6 +5,8 @@
   - [Install and Setup Fail2ban](#install-and-setup-fail2ban)
   - [Basic Configuration](#basic-configuration)
   - [Enable and Configure SSH jail in jail.local](#enable-and-configure-ssh-jail-in-jaillocal)
+  - [Restart Fail2ban](#restart-fail2ban)
+  - [Check the ban IPs](#check-the-ban-ips)
   - [Set Time Durations](#set-time-durations)
 
 # Copy file from server to NAS using rsync
@@ -85,7 +87,21 @@ Open (jail.local) and find the [sshd] section and set the values to configure th
 - bantime = 3600: This sets the duration (in seconds) for which the offending IP will be banned. Here, the ban will last for 3600 seconds (1 hour).
 - ignoreip = 127.0.0.1: This specifies IP addresses that should never be banned. In this case, it ensures that the local IP address (127.0.0.1) is never banned, which is useful to avoid locking yourself out.
 
+## Restart Fail2ban
+To apply the changes you need to restart fail2ban.
 
+    #Restart fail2ban
+    sudo systemctl restart fail2ban
+
+    #Check status
+    sudo systemctl status fail2ban
+
+
+## Check the ban IPs
+This command will show the list of banned IP Addresses.
+
+    sudo fail2ban-client status sshd
+    
 ## Set Time Durations
 
 Fail2Ban supports specifying time durations in various units, including minutes, hours, and even days. You can use the following suffixes to specify the time units:
