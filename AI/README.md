@@ -1,3 +1,9 @@
+# Table Of Contents
+- [Table Of Contents](#table-of-contents)
+- [Open Web UI](#open-web-ui)
+- [Ollama Installation](#ollama-installation)
+
+
 # Open Web UI
 
 See the official documentation of <a href="https://docs.openwebui.com/" target="_blank">Open Web UI</a> here.
