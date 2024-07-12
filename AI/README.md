@@ -27,6 +27,8 @@
 		- [Example Pre Commit Setup](#example-pre-commit-setup)
 	- [Commit a file to SVN with AI (DEMO)](#commit-a-file-to-svn-with-ai-demo)
 - [Setup Environment Variable](#setup-environment-variable)
+	- [In WINDOWS](#in-windows)
+	- [In LINUX](#in-linux)
 
 
 # Open Web UI
@@ -221,6 +223,7 @@ The SVN hook aims to ensure the quality and integrity of code files being commit
 		pip install openai
 		pip install argparse
 3. Need the SVN Repository.
+4. Set the OPENAI_API_KEY environment variable. See the docs on how to do it. [Setup Environment Variable](#setup-environment-variable)
 
 ## Setup the Check-Commit Hook Script
 
@@ -257,10 +260,31 @@ This example commit shows how openai gpt-4o analyze the code commit and determin
 
 
 
+# Setup Environment Variable 
 
+## In WINDOWS
 
+1. Type in Windows Search Bar (Edit the system environment variables).
+   
+	![alt text](../img/environmentVariable.PNG)
+2. Click the Environment Variable
+   
+	![alt text](../img/systemEnv.PNG)
 
-# Setup Environment Variable
+3. Click new the add, after adding correct Variable name and Variable value click ok.
+
+		Variable name: OPENAI_API_KEY
+		Variable value: your_actual_api_key
+	![alt text](../img/newEnv.PNG)
+
+4. Restart Your PC for the sync to take effect.
+
+5. To check if the environment variable is correctly added. Open command prompt and paste this command. If the OPENAI_API_KEY is being displayed this means its correctly added.
+   
+		echo %OPENAI_API_KEY%
+   
+
+## In LINUX
 
 To use a .bashrc file to store your environment variables, you'll need to follow these steps:
 
