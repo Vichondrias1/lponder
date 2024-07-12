@@ -14,8 +14,8 @@
 	- [Environment Variable](#environment-variable)
 	- [Image File Path](#image-file-path)
 - [Using SVN Hook Pre-Commit and Check Commit With Openai GPT-4o Model](#using-svn-hook-pre-commit-and-check-commit-with-openai-gpt-4o-model)
-	- [Objective:](#objective)
-	- [Repository Folder:](#repository-folder)
+	- [Objective](#objective)
+	- [Repository Folder](#repository-folder)
 	- [SVN Hook Used](#svn-hook-used)
 		- [Check Commit](#check-commit)
 		- [Pre-Commit Hook](#pre-commit-hook)
@@ -184,11 +184,11 @@ The response from the API includes the approval decision and reason (if rejected
 This script assumes that you have an OpenAI API key and have replaced the AI_API_KEY environment variable with your actual API key. You should also replace the image_path variable with the actual file path to the image file you want to analyze.
 
 # Using SVN Hook Pre-Commit and Check Commit With Openai GPT-4o Model
-## Objective:
+## Objective
 
 The SVN hook aims to ensure the quality and integrity of code files being committed to the SVN repository by leveraging AI-based analysis. It uses OpenAI's GPT-4 model to evaluate the code and identify any issues that may arise before allowing the commit to proceed.
 
-## Repository Folder:
+## Repository Folder
 
 - Path: PonderDevelopment/Artificial Intelligence
 
