@@ -9,6 +9,7 @@ services:
       MSSQL_SA_PASSWORD: "YourStrong!Passw0rd"
     volumes:
       - sql1_data:/var/opt/mssql
+      - ./data:/var/opt/mssql
     restart: always
 
 volumes:
