@@ -19,7 +19,7 @@ def read_file(file_path):
 
 def analyze_file_with_chat(file_name, file_path):
 
-    open_ai_key = "YOUR_API_KEY_HERE"
+    open_ai_key = os.getenv("OPENAI_API_KEY")
  
     # Initialize OpenAI client
     openai.api_key = open_ai_key
