@@ -282,7 +282,7 @@ This example commit shows how openai gpt-4o analyze the code commit and determin
 5. To check if the environment variable is correctly added. Open command prompt and paste this command. If the OPENAI_API_KEY is being displayed this means its correctly added.
    
 		echo %OPENAI_API_KEY%
-   
+	![alt text](../img/cmdCheck.PNG)   
 
 ## In LINUX
 
