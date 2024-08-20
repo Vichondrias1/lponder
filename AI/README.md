@@ -45,6 +45,13 @@
     - [Search from input text](#search-from-input-text)
     - [Search from image](#search-from-image)
   - [Wrapping up](#wrapping-up)
+- [How to format inputs to ChatGPT models](#how-to-format-inputs-to-chatgpt-models)
+  - [1. Import the openai library](#1-import-the-openai-library)
+  - [2. An example chat completion API call](#2-an-example-chat-completion-api-call)
+  - [3. Tips for instructing gpt-3.5-turbo-0301](#3-tips-for-instructing-gpt-35-turbo-0301)
+  - [4. Counting tokens](#4-counting-tokens)
+- [Zero-shot classification with embeddings](#zero-shot-classification-with-embeddings)
+  - [Zero-Shot Classification](#zero-shot-classification)
 
 
 # Open Web UI
@@ -848,3 +855,412 @@ In this notebook, we explored how to leverage the multimodal capabilities of gpt
 The search use case illustrated can be directly applied to applications such as recommendation systems, but the techniques covered in this notebook can be extended beyond items search and used in multiple use cases, for example RAG applications leveraging unstructured image data.
 
 As a next step, you could explore using a combination of rule-based filtering with keywords and embeddings search with captions to retrieve more relevant results.
+
+# How to format inputs to ChatGPT models
+ChatGPT is powered by gpt-3.5-turbo and gpt-4, OpenAI's most advanced models.
+
+You can build your own applications with gpt-3.5-turbo or gpt-4 using the OpenAI API.
+
+Chat models take a series of messages as input, and return an AI-written message as output.
+
+This guide illustrates the chat format with a few example API calls.
+
+## 1. Import the openai library
+```python
+# if needed, install and/or upgrade to the latest version of the OpenAI Python library
+%pip install --upgrade openai
+%pip install tiktoken
+```
+
+```python
+# import the OpenAI Python library for calling the OpenAI API
+from openai import OpenAI
+import os
+import json
+
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "<your OpenAI API key if not set as env var>"))
+```
+
+## 2. An example chat completion API call
+A chat completion API call parameters, Required
+
+- model: the name of the model you want to use (e.g., gpt-3.5-turbo, gpt-4, gpt-3.5-turbo-16k-1106)
+- messages: a list of message objects, where each object has two required fields:
+    - role: the role of the messenger (either system, user, assistant or tool)
+    - content: the content of the message (e.g., Write me a beautiful poem)
+Messages can also contain an optional name field, which give the messenger a name. E.g., example-user, Alice, BlackbeardBot. Names may not contain spaces.
+
+**Optional**
+
+- frequency_penalty: Penalizes tokens based on their frequency, reducing repetition.
+- logit_bias: Modifies likelihood of specified tokens with bias values.
+- logprobs: Returns log probabilities of output tokens if true.
+- top_logprobs: Specifies the number of most likely tokens to return at each position.
+- max_tokens: Sets the maximum number of generated tokens in chat completion.
+- n: Generates a specified number of chat completion choices for each input.
+- presence_penalty: Penalizes new tokens based on their presence in the text.
+- response_format: Specifies the output format, e.g., JSON mode.
+- seed: Ensures deterministic sampling with a specified seed.
+- stop: Specifies up to 4 sequences where the API should stop generating tokens.
+- stream: Sends partial message deltas as tokens become available.
+- temperature: Sets the sampling temperature between 0 and 2.
+- top_p: Uses nucleus sampling; considers tokens with top_p probability mass.
+- tools: Lists functions the model may call.
+- tool_choice: Controls the model's function calls (none/auto/function).
+- user: Unique identifier for end-user monitoring and abuse detection.
+
+As of January 2024, you can also optionally submit a list of functions that tell GPT whether it can generate JSON to feed into a function. For details, see the documentation, API reference, or the Cookbook guide How to call functions with chat models.
+
+Typically, a conversation will start with a system message that tells the assistant how to behave, followed by alternating user and assistant messages, but you are not required to follow this format.
+
+Let's look at an example chat API calls to see how the chat format works in practice.
+```python
+# Example OpenAI Python library request
+MODEL = "gpt-3.5-turbo"
+response = client.chat.completions.create(
+    model=MODEL,
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Knock knock."},
+        {"role": "assistant", "content": "Who's there?"},
+        {"role": "user", "content": "Orange."},
+    ],
+    temperature=0,
+)
+```
+
+```python
+print(json.dumps(json.loads(response.model_dump_json()), indent=4))
+```
+As you can see, the response object has a few fields:
+
+- id: the ID of the request
+- choices: a list of completion objects (only one, unless you set n greater than 1)
+- finish_reason: the reason the model stopped generating text (either stop, or length if max_tokens limit was reached)
+- index: The index of the choice in the list of choices.
+- logprobs: Log probability information for the choice.
+- message: the message object generated by the model
+    - content: content of message
+    - role: The role of the author of this message.
+    - tool_calls: The tool calls generated by the model, such as function calls. if the - tools is given
+- created: the timestamp of the request
+- model: the full name of the model used to generate the response
+- object: the type of object returned (e.g., chat.completion)
+- system_fingerprint: This fingerprint represents the backend configuration that the - model runs with.
+- usage: the number of tokens used to generate the replies, counting prompt, completion, and total
+
+Extract just the reply with:
+
+```python
+response.choices[0].message.content
+```
+
+Even non-conversation-based tasks can fit into the chat format, by placing the instruction in the first user message.
+
+For example, to ask the model to explain asynchronous programming in the style of the pirate Blackbeard, we can structure conversation as follows:
+
+```python
+# example with a system message
+response = client.chat.completions.create(
+    model=MODEL,
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Explain asynchronous programming in the style of the pirate Blackbeard."},
+    ],
+    temperature=0,
+)
+
+print(response.choices[0].message.content)
+
+```
+```python
+# example without a system message
+response = client.chat.completions.create(
+    model=MODEL,
+    messages=[
+        {"role": "user", "content": "Explain asynchronous programming in the style of the pirate Blackbeard."},
+    ],
+    temperature=0,
+)
+
+print(response.choices[0].message.content)
+```
+## 3. Tips for instructing gpt-3.5-turbo-0301
+Best practices for instructing models may change from model version to model version. The advice that follows applies to gpt-3.5-turbo-0301 and may not apply to future models.
+
+**System messages**
+
+The system message can be used to prime the assistant with different personalities or behaviors.
+
+Be aware that gpt-3.5-turbo-0301 does not generally pay as much attention to the system message as gpt-4-0314 or gpt-3.5-turbo-0613. Therefore, for gpt-3.5-turbo-0301, we recommend placing important instructions in the user message instead. Some developers have found success in continually moving the system message near the end of the conversation to keep the model's attention from drifting away as conversations get longer.
+
+```python
+# An example of a system message that primes the assistant to explain concepts in great depth
+response = client.chat.completions.create(
+    model=MODEL,
+    messages=[
+        {"role": "system", "content": "You are a friendly and helpful teaching assistant. You explain concepts in great depth using simple terms, and you give examples to help people learn. At the end of each explanation, you ask a question to check for understanding"},
+        {"role": "user", "content": "Can you explain how fractions work?"},
+    ],
+    temperature=0,
+)
+
+print(response.choices[0].message.content)
+```
+
+```python
+# An example of a system message that primes the assistant to give brief, to-the-point answers
+response = client.chat.completions.create(
+    model=MODEL,
+    messages=[
+        {"role": "system", "content": "You are a laconic assistant. You reply with brief, to-the-point answers with no elaboration."},
+        {"role": "user", "content": "Can you explain how fractions work?"},
+    ],
+    temperature=0,
+)
+
+print(response.choices[0].message.content)
+```
+
+**Few-shot prompting**
+
+In some cases, it's easier to show the model what you want rather than tell the model what you want.
+
+One way to show the model what you want is with faked example messages.
+
+For example:
+```python
+# An example of a faked few-shot conversation to prime the model into translating business jargon to simpler speech
+response = client.chat.completions.create(
+    model=MODEL,
+    messages=[
+        {"role": "system", "content": "You are a helpful, pattern-following assistant."},
+        {"role": "user", "content": "Help me translate the following corporate jargon into plain English."},
+        {"role": "assistant", "content": "Sure, I'd be happy to!"},
+        {"role": "user", "content": "New synergies will help drive top-line growth."},
+        {"role": "assistant", "content": "Things working well together will increase revenue."},
+        {"role": "user", "content": "Let's circle back when we have more bandwidth to touch base on opportunities for increased leverage."},
+        {"role": "assistant", "content": "Let's talk later when we're less busy about how to do better."},
+        {"role": "user", "content": "This late pivot means we don't have time to boil the ocean for the client deliverable."},
+    ],
+    temperature=0,
+)
+
+print(response.choices[0].message.content)
+```
+
+To help clarify that the example messages are not part of a real conversation, and shouldn't be referred back to by the model, you can try setting the name field of system messages to example_user and example_assistant.
+
+Transforming the few-shot example above, we could write:
+
+```python
+# The business jargon translation example, but with example names for the example messages
+response = client.chat.completions.create(
+    model=MODEL,
+    messages=[
+        {"role": "system", "content": "You are a helpful, pattern-following assistant that translates corporate jargon into plain English."},
+        {"role": "system", "name":"example_user", "content": "New synergies will help drive top-line growth."},
+        {"role": "system", "name": "example_assistant", "content": "Things working well together will increase revenue."},
+        {"role": "system", "name":"example_user", "content": "Let's circle back when we have more bandwidth to touch base on opportunities for increased leverage."},
+        {"role": "system", "name": "example_assistant", "content": "Let's talk later when we're less busy about how to do better."},
+        {"role": "user", "content": "This late pivot means we don't have time to boil the ocean for the client deliverable."},
+    ],
+    temperature=0,
+)
+
+print(response.choices[0].message.content)
+```
+Not every attempt at engineering conversations will succeed at first.
+
+If your first attempts fail, don't be afraid to experiment with different ways of priming or conditioning the model.
+
+As an example, one developer discovered an increase in accuracy when they inserted a user message that said "Great job so far, these have been perfect" to help condition the model into providing higher quality responses.
+
+For more ideas on how to lift the reliability of the models, consider reading our guide on techniques to increase reliability. It was written for non-chat models, but many of its principles still apply.
+
+## 4. Counting tokens
+
+When you submit your request, the API transforms the messages into a sequence of tokens.
+
+The number of tokens used affects:
+
+- the cost of the request
+- the time it takes to generate the response
+- when the reply gets cut off from hitting the maximum token limit (4,096 for gpt-3.5-turbo or 8,192 for gpt-4)
+
+You can use the following function to count the number of tokens that a list of messages will use.
+
+Note that the exact way that tokens are counted from messages may change from model to model. Consider the counts from the function below an estimate, not a timeless guarantee.
+
+In particular, requests that use the optional functions input will consume extra tokens on top of the estimates calculated below.
+
+Read more about counting tokens in How to count tokens with tiktoken.
+
+```python
+import tiktoken
+
+
+def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613"):
+    """Return the number of tokens used by a list of messages."""
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        print("Warning: model not found. Using cl100k_base encoding.")
+        encoding = tiktoken.get_encoding("cl100k_base")
+    if model in {
+        "gpt-3.5-turbo-0613",
+        "gpt-3.5-turbo-16k-0613",
+        "gpt-4-0314",
+        "gpt-4-32k-0314",
+        "gpt-4-0613",
+        "gpt-4-32k-0613",
+        }:
+        tokens_per_message = 3
+        tokens_per_name = 1
+    elif model == "gpt-3.5-turbo-0301":
+        tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
+        tokens_per_name = -1  # if there's a name, the role is omitted
+    elif "gpt-3.5-turbo" in model:
+        print("Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613.")
+        return num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613")
+    elif "gpt-4" in model:
+        print("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
+        return num_tokens_from_messages(messages, model="gpt-4-0613")
+    else:
+        raise NotImplementedError(
+            f"""num_tokens_from_messages() is not implemented for model {model}."""
+        )
+    num_tokens = 0
+    for message in messages:
+        num_tokens += tokens_per_message
+        for key, value in message.items():
+            num_tokens += len(encoding.encode(value))
+            if key == "name":
+                num_tokens += tokens_per_name
+    num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
+    return num_tokens
+
+```
+
+```python
+# let's verify the function above matches the OpenAI API response
+example_messages = [
+    {
+        "role": "system",
+        "content": "You are a helpful, pattern-following assistant that translates corporate jargon into plain English.",
+    },
+    {
+        "role": "system",
+        "name": "example_user",
+        "content": "New synergies will help drive top-line growth.",
+    },
+    {
+        "role": "system",
+        "name": "example_assistant",
+        "content": "Things working well together will increase revenue.",
+    },
+    {
+        "role": "system",
+        "name": "example_user",
+        "content": "Let's circle back when we have more bandwidth to touch base on opportunities for increased leverage.",
+    },
+    {
+        "role": "system",
+        "name": "example_assistant",
+        "content": "Let's talk later when we're less busy about how to do better.",
+    },
+    {
+        "role": "user",
+        "content": "This late pivot means we don't have time to boil the ocean for the client deliverable.",
+    },
+]
+
+for model in [
+    # "gpt-3.5-turbo-0301",
+    # "gpt-4-0314",
+    # "gpt-4-0613",
+    "gpt-3.5-turbo-1106",
+    "gpt-3.5-turbo",
+    "gpt-4",
+    "gpt-4-1106-preview",
+    ]:
+    print(model)
+    # example token count from the function defined above
+    print(f"{num_tokens_from_messages(example_messages, model)} prompt tokens counted by num_tokens_from_messages().")
+    # example token count from the OpenAI API
+    response = client.chat.completions.create(model=model,
+    messages=example_messages,
+    temperature=0,
+    max_tokens=1)
+    token = response.usage.prompt_tokens
+    print(f'{token} prompt tokens counted by the OpenAI API.')
+    print()
+
+```
+
+# Zero-shot classification with embeddings
+
+In this notebook we will classify the sentiment of reviews using embeddings and zero labeled data! The dataset is created in the Get_embeddings_from_dataset Notebook.
+
+We'll define positive sentiment to be 4- and 5-star reviews, and negative sentiment to be 1- and 2-star reviews. 3-star reviews are considered neutral and we won't use them for this example.
+
+We will perform zero-shot classification by embedding descriptions of each class and then comparing new samples to those class embeddings.
+
+```python 
+import pandas as pd
+import numpy as np
+from ast import literal_eval
+
+from sklearn.metrics import classification_report
+
+EMBEDDING_MODEL = "text-embedding-3-small"
+
+datafile_path = "data/fine_food_reviews_with_embeddings_1k.csv"
+
+df = pd.read_csv(datafile_path)
+df["embedding"] = df.embedding.apply(literal_eval).apply(np.array)
+
+# convert 5-star rating to binary sentiment
+df = df[df.Score != 3]
+df["sentiment"] = df.Score.replace({1: "negative", 2: "negative", 4: "positive", 5: "positive"})
+```
+## Zero-Shot Classification
+
+To perform zero shot classification, we want to predict labels for our samples without any training. To do this, we can simply embed short descriptions of each label, such as positive and negative, and then compare the cosine distance between embeddings of samples and label descriptions.
+
+The highest similarity label to the sample input is the predicted label. We can also define a prediction score to be the difference between the cosine distance to the positive and to the negative label. This score can be used for plotting a precision-recall curve, which can be used to select a different tradeoff between precision and recall, by selecting a different threshold.
+
+```python
+from utils.embeddings_utils import cosine_similarity, get_embedding
+from sklearn.metrics import PrecisionRecallDisplay
+
+def evaluate_embeddings_approach(
+    labels = ['negative', 'positive'],
+    model = EMBEDDING_MODEL,
+):
+    label_embeddings = [get_embedding(label, model=model) for label in labels]
+
+    def label_score(review_embedding, label_embeddings):
+        return cosine_similarity(review_embedding, label_embeddings[1]) - cosine_similarity(review_embedding, label_embeddings[0])
+
+    probas = df["embedding"].apply(lambda x: label_score(x, label_embeddings))
+    preds = probas.apply(lambda x: 'positive' if x>0 else 'negative')
+
+    report = classification_report(df.sentiment, preds)
+    print(report)
+
+    display = PrecisionRecallDisplay.from_predictions(df.sentiment, probas, pos_label='positive')
+    _ = display.ax_.set_title("2-class Precision-Recall curve")
+
+evaluate_embeddings_approach(labels=['negative', 'positive'], model=EMBEDDING_MODEL)
+```
+![alt text](../img/zeroshot1.png)
+
+We can see that this classifier already performs extremely well. We used similarity embeddings, and the simplest possible label name. Let's try to improve on this by using more descriptive label names, and search embeddings.
+
+```python
+evaluate_embeddings_approach(labels=['An Amazon review with a negative sentiment.', 'An Amazon review with a positive sentiment.'])
+```
+![alt text](../img/zeroshot2.png)
+
+As shown above, zero-shot classification with embeddings can lead to great results, especially when the labels are more descriptive than just simple words.
