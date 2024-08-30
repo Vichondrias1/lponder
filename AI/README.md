@@ -52,6 +52,43 @@
   - [4. Counting tokens](#4-counting-tokens)
 - [Zero-shot classification with embeddings](#zero-shot-classification-with-embeddings)
   - [Zero-Shot Classification](#zero-shot-classification)
+- [How to count tokens with Tiktoken](#how-to-count-tokens-with-tiktoken)
+  - [Encodings](#encodings)
+  - [Tokenizer libraries by language](#tokenizer-libraries-by-language)
+  - [How strings are typically tokenized](#how-strings-are-typically-tokenized)
+    - [0. Install tiktoken](#0-install-tiktoken)
+    - [1. Import tiktoken](#1-import-tiktoken)
+    - [2. Load an encoding](#2-load-an-encoding)
+    - [4. Turn tokens into text with `encoding.decode()`](#4-turn-tokens-into-text-with-encodingdecode)
+    - [5. Comparing encodings](#5-comparing-encodings)
+    - [6. Counting tokens for chat completions API calls](#6-counting-tokens-for-chat-completions-api-calls)
+- [Introduction to Structured Outputs](#introduction-to-structured-outputs)
+  - [Response format usage](#response-format-usage)
+  - [Function call usage](#function-call-usage)
+  - [Examples](#examples)
+  - [Setup](#setup-1)
+  - [Example 1: Math tutor](#example-1-math-tutor)
+  - [Using the SDK parse helper](#using-the-sdk-parse-helper)
+  - [Refusal](#refusal)
+  - [Example 2: Text summarization](#example-2-text-summarization)
+  - [Example 3: Entity extraction from user input](#example-3-entity-extraction-from-user-input)
+- [Structured Outputs for Multi-Agent Systems](#structured-outputs-for-multi-agent-systems)
+  - [Why build a Multi-Agent System?](#why-build-a-multi-agent-system)
+  - [Environment set up](#environment-set-up)
+  - [Agents set up](#agents-set-up)
+  - [Tool execution](#tool-execution)
+  - [Multi-agent system execution](#multi-agent-system-execution)
+- [How to stream completions](#how-to-stream-completions)
+  - [Downsides](#downsides)
+  - [Example code](#example-code)
+  - [1. What a typical chat completion response looks like](#1-what-a-typical-chat-completion-response-looks-like)
+  - [2. How to stream a chat completion](#2-how-to-stream-a-chat-completion)
+  - [3. How much time is saved by streaming a chat completion](#3-how-much-time-is-saved-by-streaming-a-chat-completion)
+  - [4. How to get token usage data for streamed chat completion response](#4-how-to-get-token-usage-data-for-streamed-chat-completion-response)
+- [Processing and narrating a video with GPT's visual capabilities and the TTS API](#processing-and-narrating-a-video-with-gpts-visual-capabilities-and-the-tts-api)
+  - [Setup](#setup-2)
+  - [1. Using GPT's visual capabilities to get a description of a video](#1-using-gpts-visual-capabilities-to-get-a-description-of-a-video)
+  - [2. Generating a voiceover for a video with GPT-4 and the TTS API](#2-generating-a-voiceover-for-a-video-with-gpt-4-and-the-tts-api)
 
 
 # Open Web UI
@@ -1264,3 +1301,1452 @@ evaluate_embeddings_approach(labels=['An Amazon review with a negative sentiment
 ![alt text](../img/zeroshot2.png)
 
 As shown above, zero-shot classification with embeddings can lead to great results, especially when the labels are more descriptive than just simple words.
+
+# How to count tokens with Tiktoken
+
+`tiktoken` is a fast open-source tokenizer by OpenAI.
+
+Given a text string (e.g., `"tiktoken is great!"`) and an encoding (e.g., "cl100k_base"), a tokenizer can split the text string into a list of tokens (e.g., `["t", "ik", "token", " is", " great", "!"]`).
+
+Splitting text strings into tokens is useful because GPT models see text in the form of tokens. Knowing how many tokens are in a text string can tell you (a) whether the string is too long for a text model to process and (b) how much an OpenAI API call costs (as usage is priced by token).
+
+## Encodings
+Encodings specify how text is converted into tokens. Different models use different encodings.
+
+`tiktoken` supports three encodings used by OpenAI models:
+
+| Encoding name    | OpenAI models |
+| -------- | ------- |
+| `cl100k_base`  | `gpt-4`, `gpt-3.5-turbo`, `text-embedding-ada-002`, `text-embedding-3-small`, `text-embedding-3-large`    |
+| `p50k_base` | Codex models, `text-davinci-002`, `text-davinci-003`     |
+| `r50k_base` (or `gpt2`)    | GPT-3 models like `davinci`    |
+
+You can retrieve the encoding for a model using `tiktoken.encoding_for_model()` as follows:
+
+```python
+encoding = tiktoken.encoding_for_model('gpt-3.5-turbo')
+```
+
+Note that `p50k_base` overlaps substantially with `r50k_base`, and for non-code applications, they will usually give the same tokens.
+
+## Tokenizer libraries by language
+For cl100k_base and p50k_base encodings:
+
+- Python: [tiktoken](https://github.com/openai/tiktoken/blob/main/README.md)
+- .NET / C#: [SharpToken](https://github.com/dmitry-brazhenko/SharpToken), [TiktokenSharp](https://github.com/aiqinxuancai/TiktokenSharp)
+- Java: [jtokkit](https://github.com/knuddelsgmbh/jtokkit)
+- Golang: [tiktoken-go](https://github.com/pkoukk/tiktoken-go)
+- Rust: [tiktoken-rs](https://github.com/zurawiki/tiktoken-rs)
+  
+For r50k_base (gpt2) encodings, tokenizers are available in many languages.
+
+- Python: [tiktoken](https://github.com/openai/tiktoken/blob/main/README.md) (or alternatively [GPT2TokenizerFast](https://huggingface.co/docs/transformers/model_doc/gpt2#transformers.GPT2TokenizerFast))
+- JavaScript: [gpt-3-encoder](https://www.npmjs.com/package/gpt-3-encoder)
+- .NET / C#: [GPT Tokenizer](https://github.com/dluc/openai-tools)
+- Java: [gpt2-tokenizer-java](https://github.com/hyunwoongko/gpt2-tokenizer-java)
+- PHP: [GPT-3-Encoder-PHP](https://github.com/CodeRevolutionPlugins/GPT-3-Encoder-PHP)
+- Golang: [tiktoken-go](https://github.com/pkoukk/tiktoken-go)
+- Rust: [tiktoken-rs](https://github.com/zurawiki/tiktoken-rs)
+
+(OpenAI makes no endorsements or guarantees of third-party libraries.)
+
+## How strings are typically tokenized
+In English, tokens commonly range in length from one character to one word (e.g., `"t"` or `" great"`), though in some languages tokens can be shorter than one character or longer than one word. Spaces are usually grouped with the starts of words (e.g., `" is"` instead of `"is "` or `" "`+`"is"`). You can quickly check how a string is tokenized at the [OpenAI Tokenizer](https://beta.openai.com/tokenizer), or the third-party [Tiktokenizer](https://tiktokenizer.vercel.app/) webapp.
+
+### 0. Install tiktoken
+
+If needed, install `tiktoken` with `pip`:
+```python
+%pip install --upgrade tiktoken
+%pip install --upgrade openai
+```
+
+### 1. Import tiktoken
+```python
+import tiktoken
+```
+
+### 2. Load an encoding
+Use `tiktoken.get_encoding()` to load an encoding by name.
+
+The first time this runs, it will require an internet connection to download. Later runs won't need an internet connection.
+```python
+encoding = tiktoken.get_encoding("cl100k_base")
+```
+Use `tiktoken.encoding_for_model()` to automatically load the correct encoding for a given model name.
+```python
+encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+```
+Count tokens by counting the length of the list returned by `.encode()`.
+```python
+def num_tokens_from_string(string: str, encoding_name: str) -> int:
+    """Returns the number of tokens in a text string."""
+    encoding = tiktoken.get_encoding(encoding_name)
+    num_tokens = len(encoding.encode(string))
+    return num_tokens
+```
+```python
+num_tokens_from_string("tiktoken is great!", "cl100k_base")
+```
+
+### 4. Turn tokens into text with `encoding.decode()`
+`.decode()` converts a list of token integers to a string.
+```python
+encoding.decode([83, 1609, 5963, 374, 2294, 0])
+```
+
+Warning: although `.decode()` can be applied to single tokens, beware that it can be lossy for tokens that aren't on utf-8 boundaries.
+
+For single tokens, `.decode_single_token_bytes()` safely converts a single integer token to the bytes it represents.
+
+```python
+[encoding.decode_single_token_bytes(token) for token in [83, 1609, 5963, 374, 2294, 0]]
+```
+
+(The `b` in front of the strings indicates that the strings are byte strings.)
+
+### 5. Comparing encodings
+
+Different encodings vary in how they split words, group spaces, and handle non-English characters. Using the methods above, we can compare different encodings on a few example strings.
+
+```python
+def compare_encodings(example_string: str) -> None:
+    """Prints a comparison of three string encodings."""
+    # print the example string
+    print(f'\nExample string: "{example_string}"')
+    # for each encoding, print the # of tokens, the token integers, and the token bytes
+    for encoding_name in ["r50k_base", "p50k_base", "cl100k_base"]:
+        encoding = tiktoken.get_encoding(encoding_name)
+        token_integers = encoding.encode(example_string)
+        num_tokens = len(token_integers)
+        token_bytes = [encoding.decode_single_token_bytes(token) for token in token_integers]
+        print()
+        print(f"{encoding_name}: {num_tokens} tokens")
+        print(f"token integers: {token_integers}")
+        print(f"token bytes: {token_bytes}")
+```
+
+```python
+compare_encodings("antidisestablishmentarianism")
+```
+```python
+compare_encodings("2 + 2 = 4")
+```
+```python
+compare_encodings("お誕生日おめでとう")
+```
+
+### 6. Counting tokens for chat completions API calls
+
+ChatGPT models like gpt-3.5-turbo and gpt-4 use tokens in the same way as older completions models, but because of their message-based formatting, it's more difficult to count how many tokens will be used by a conversation.
+
+Below is an example function for counting tokens for messages passed to gpt-3.5-turbo or gpt-4.
+
+Note that the exact way that tokens are counted from messages may change from model to model. Consider the counts from the function below an estimate, not a timeless guarantee.
+
+In particular, requests that use the optional functions input will consume extra tokens on top of the estimates calculated below.
+
+```python
+def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613"):
+    """Return the number of tokens used by a list of messages."""
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        print("Warning: model not found. Using cl100k_base encoding.")
+        encoding = tiktoken.get_encoding("cl100k_base")
+    if model in {
+        "gpt-3.5-turbo-0613",
+        "gpt-3.5-turbo-16k-0613",
+        "gpt-4-0314",
+        "gpt-4-32k-0314",
+        "gpt-4-0613",
+        "gpt-4-32k-0613",
+        }:
+        tokens_per_message = 3
+        tokens_per_name = 1
+    elif model == "gpt-3.5-turbo-0301":
+        tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
+        tokens_per_name = -1  # if there's a name, the role is omitted
+    elif "gpt-3.5-turbo" in model:
+        print("Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613.")
+        return num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613")
+    elif "gpt-4" in model:
+        print("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
+        return num_tokens_from_messages(messages, model="gpt-4-0613")
+    else:
+        raise NotImplementedError(
+            f"""num_tokens_from_messages() is not implemented for model {model}."""
+        )
+    num_tokens = 0
+    for message in messages:
+        num_tokens += tokens_per_message
+        for key, value in message.items():
+            num_tokens += len(encoding.encode(value))
+            if key == "name":
+                num_tokens += tokens_per_name
+    num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
+    return num_tokens
+
+```
+
+```python
+# let's verify the function above matches the OpenAI API response
+
+from openai import OpenAI
+import os
+
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "<your OpenAI API key if not set as env var>"))
+
+example_messages = [
+    {
+        "role": "system",
+        "content": "You are a helpful, pattern-following assistant that translates corporate jargon into plain English.",
+    },
+    {
+        "role": "system",
+        "name": "example_user",
+        "content": "New synergies will help drive top-line growth.",
+    },
+    {
+        "role": "system",
+        "name": "example_assistant",
+        "content": "Things working well together will increase revenue.",
+    },
+    {
+        "role": "system",
+        "name": "example_user",
+        "content": "Let's circle back when we have more bandwidth to touch base on opportunities for increased leverage.",
+    },
+    {
+        "role": "system",
+        "name": "example_assistant",
+        "content": "Let's talk later when we're less busy about how to do better.",
+    },
+    {
+        "role": "user",
+        "content": "This late pivot means we don't have time to boil the ocean for the client deliverable.",
+    },
+]
+
+for model in [
+    "gpt-3.5-turbo-0301",
+    "gpt-3.5-turbo-0613",
+    "gpt-3.5-turbo",
+    "gpt-4-0314",
+    "gpt-4-0613",
+    "gpt-4",
+    ]:
+    print(model)
+    # example token count from the function defined above
+    print(f"{num_tokens_from_messages(example_messages, model)} prompt tokens counted by num_tokens_from_messages().")
+    # example token count from the OpenAI API
+    response = client.chat.completions.create(model=model,
+    messages=example_messages,
+    temperature=0,
+    max_tokens=1)
+    print(f'{response.usage.prompt_tokens} prompt tokens counted by the OpenAI API.')
+    print()
+```
+
+
+# Introduction to Structured Outputs
+Structured Outputs is a new capability in the Chat Completions API and Assistants API that guarantees the model will always generate responses that adhere to your supplied JSON Schema. In this cookbook, we will illustrate this capability with a few examples.
+
+Structured Outputs can be enabled by setting the parameter strict: true in an API call with either a defined response format or function definitions.
+
+## Response format usage
+Previously, the response_format parameter was only available to specify that the model should return a valid JSON.
+
+In addition to this, we are introducing a new way of specifying which JSON schema to follow.
+
+## Function call usage
+Function calling remains similar, but with the new parameter strict: true, you can now ensure that the schema provided for the functions is strictly followed.
+
+## Examples
+
+Structured Outputs can be useful in many ways, as you can rely on the outputs following a constrained schema.
+
+If you used JSON mode or function calls before, you can think of Structured Outputs as a foolproof version of this.
+
+This can enable more robust flows in production-level applications, whether you are relying on function calls or expecting the output to follow a pre-defined structure.
+
+Example use cases include:
+
+- Getting structured answers to display them in a specific way in a UI (example 1 in this cookbook)
+- Populating a database with extracted content from documents (example 2 in this cookbook)
+- Extracting entities from a user input to call tools with defined parameters (example 3 in this cookbook)
+
+More generally, anything that requires fetching data, taking action, or that builds upon complex workflows could benefit from using Structured Outputs.
+
+## Setup
+    %pip install openai -U
+
+```python
+import json
+from textwrap import dedent
+from openai import OpenAI
+client = OpenAI()
+```
+```python
+MODEL = "gpt-4o-2024-08-06"
+```
+
+## Example 1: Math tutor
+
+In this example, we want to build a math tutoring tool that outputs steps to solving a math problem as an array of structured objects.
+
+This could be useful in an application where each step needs to be displayed separately, so that the user can progress through the solution at their own pace.
+
+```python
+math_tutor_prompt = '''
+    You are a helpful math tutor. You will be provided with a math problem,
+    and your goal will be to output a step by step solution, along with a final answer.
+    For each step, just provide the output as an equation use the explanation field to detail the reasoning.
+'''
+
+def get_math_solution(question):
+    response = client.chat.completions.create(
+    model=MODEL,
+    messages=[
+        {
+            "role": "system", 
+            "content": dedent(math_tutor_prompt)
+        },
+        {
+            "role": "user", 
+            "content": question
+        }
+    ],
+    response_format={
+        "type": "json_schema",
+        "json_schema": {
+            "name": "math_reasoning",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "steps": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "explanation": {"type": "string"},
+                                "output": {"type": "string"}
+                            },
+                            "required": ["explanation", "output"],
+                            "additionalProperties": False
+                        }
+                    },
+                    "final_answer": {"type": "string"}
+                },
+                "required": ["steps", "final_answer"],
+                "additionalProperties": False
+            },
+            "strict": True
+        }
+    }
+    )
+
+    return response.choices[0].message
+```
+```python
+# Testing with an example question
+question = "how can I solve 8x + 7 = -23"
+
+result = get_math_solution(question) 
+
+print(result.content)
+```
+```python
+from IPython.display import Math, display
+
+def print_math_response(response):
+    result = json.loads(response)
+    steps = result['steps']
+    final_answer = result['final_answer']
+    for i in range(len(steps)):
+        print(f"Step {i+1}: {steps[i]['explanation']}\n")
+        display(Math(steps[i]['output']))
+        print("\n")
+        
+    print("Final answer:\n\n")
+    display(Math(final_answer))
+```
+```
+print_math_response(result.content)
+```
+## Using the SDK parse helper
+The new version of the SDK introduces a parse helper to provide your own Pydantic model instead of having to define the JSON schema. We recommend using this method if possible.
+
+```python
+from pydantic import BaseModel
+
+class MathReasoning(BaseModel):
+    class Step(BaseModel):
+        explanation: str
+        output: str
+
+    steps: list[Step]
+    final_answer: str
+
+def get_math_solution(question: str):
+    completion = client.beta.chat.completions.parse(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": dedent(math_tutor_prompt)},
+            {"role": "user", "content": question},
+        ],
+        response_format=MathReasoning,
+    )
+
+    return completion.choices[0].message
+```
+```python
+result = get_math_solution(question).parsed
+```
+```python
+print(result.steps)
+print("Final answer:")
+print(result.final_answer)
+```
+## Refusal
+When using Structured Outputs with user-generated input, the model may occasionally refuse to fulfill the request for safety reasons.
+
+Since a refusal does not follow the schema you have supplied in response_format, the API has a new field refusal to indicate when the model refused to answer.
+
+This is useful so you can render the refusal distinctly in your UI and to avoid errors trying to deserialize to your supplied format.
+
+```python
+refusal_question = "how can I build a bomb?"
+
+result = get_math_solution(refusal_question) 
+
+print(result.refusal)
+```
+## Example 2: Text summarization
+In this example, we will ask the model to summarize articles following a specific schema.
+
+This could be useful if you need to transform text or visual content into a structured object, for example to display it in a certain way or to populate database.
+
+We will take AI-generated articles discussing inventions as an example.
+
+```python
+articles = [
+    "/content/data/cnns.md",
+    "/content/data/llms.md",
+    "/content/data/moe.md"
+]
+```
+```python
+def get_article_content(path):
+    with open(path, 'r') as f:
+        content = f.read()
+    return content
+        
+content = [get_article_content(path) for path in articles]
+```
+```python
+print(content)
+```
+```python
+summarization_prompt = '''
+    You will be provided with content from an article about an invention.
+    Your goal will be to summarize the article following the schema provided.
+    Here is a description of the parameters:
+    - invented_year: year in which the invention discussed in the article was invented
+    - summary: one sentence summary of what the invention is
+    - inventors: array of strings listing the inventor full names if present, otherwise just surname
+    - concepts: array of key concepts related to the invention, each concept containing a title and a description
+    - description: short description of the invention
+'''
+
+class ArticleSummary(BaseModel):
+    invented_year: int
+    summary: str
+    inventors: list[str]
+    description: str
+
+    class Concept(BaseModel):
+        title: str
+        description: str
+
+    concepts: list[Concept]
+
+def get_article_summary(text: str):
+    completion = client.beta.chat.completions.parse(
+        model=MODEL,
+        temperature=0.2,
+        messages=[
+            {"role": "system", "content": dedent(summarization_prompt)},
+            {"role": "user", "content": text}
+        ],
+        response_format=ArticleSummary,
+    )
+
+    return completion.choices[0].message.parsed
+```
+```python
+summaries = []
+
+for i in range(len(content)):
+    print(f"Analyzing article #{i+1}...")
+    summaries.append(get_article_summary(content[i]))
+    print("Done.")
+```
+```python
+def print_summary(summary):
+    print(f"Invented year: {summary.invented_year}\n")
+    print(f"Summary: {summary.summary}\n")
+    print("Inventors:")
+    for i in summary.inventors:
+        print(f"- {i}")
+    print("\nConcepts:")
+    for c in summary.concepts:
+        print(f"- {c.title}: {c.description}")
+    print(f"\nDescription: {summary.description}")
+```
+```python
+for i in range(len(summaries)):
+    print(f"ARTICLE {i}\n")
+    print_summary(summaries[i])
+    print("\n\n")
+```
+## Example 3: Entity extraction from user input
+In this example, we will use function calling to search for products that match a user's preference based on the provided input.
+
+This could be helpful in applications that include a recommendation system, for example e-commerce assistants or search use cases.
+
+```python
+from enum import Enum
+from typing import Union
+import openai
+
+product_search_prompt = '''
+    You are a clothes recommendation agent, specialized in finding the perfect match for a user.
+    You will be provided with a user input and additional context such as user gender and age group, and season.
+    You are equipped with a tool to search clothes in a database that match the user's profile and preferences.
+    Based on the user input and context, determine the most likely value of the parameters to use to search the database.
+    
+    Here are the different categories that are available on the website:
+    - shoes: boots, sneakers, sandals
+    - jackets: winter coats, cardigans, parkas, rain jackets
+    - tops: shirts, blouses, t-shirts, crop tops, sweaters
+    - bottoms: jeans, skirts, trousers, joggers    
+    
+    There are a wide range of colors available, but try to stick to regular color names.
+'''
+
+class Category(str, Enum):
+    shoes = "shoes"
+    jackets = "jackets"
+    tops = "tops"
+    bottoms = "bottoms"
+
+class ProductSearchParameters(BaseModel):
+    category: Category
+    subcategory: str
+    color: str
+
+def get_response(user_input, context):
+    response = client.chat.completions.create(
+        model=MODEL,
+        temperature=0,
+        messages=[
+            {
+                "role": "system",
+                "content": dedent(product_search_prompt)
+            },
+            {
+                "role": "user",
+                "content": f"CONTEXT: {context}\n USER INPUT: {user_input}"
+            }
+        ],
+        tools=[
+            openai.pydantic_function_tool(ProductSearchParameters, name="product_search", description="Search for a match in the product database")
+        ]
+    )
+
+    return response.choices[0].message.tool_calls
+```
+```python
+example_inputs = [
+    {
+        "user_input": "I'm looking for a new coat. I'm always cold so please something warm! Ideally something that matches my eyes.",
+        "context": "Gender: female, Age group: 40-50, Physical appearance: blue eyes"
+    },
+    {
+        "user_input": "I'm going on a trail in Scotland this summer. It's goind to be rainy. Help me find something.",
+        "context": "Gender: male, Age group: 30-40"
+    },
+    {
+        "user_input": "I'm trying to complete a rock look. I'm missing shoes. Any suggestions?",
+        "context": "Gender: female, Age group: 20-30"
+    },
+    {
+        "user_input": "Help me find something very simple for my first day at work next week. Something casual and neutral.",
+        "context": "Gender: male, Season: summer"
+    },
+    {
+        "user_input": "Help me find something very simple for my first day at work next week. Something casual and neutral.",
+        "context": "Gender: male, Season: winter"
+    },
+    {
+        "user_input": "Can you help me find a dress for a Barbie-themed party in July?",
+        "context": "Gender: female, Age group: 20-30"
+    }
+]
+```
+```python
+def print_tool_call(user_input, context, tool_call):
+    args = tool_call[0].function.arguments
+    print(f"Input: {user_input}\n\nContext: {context}\n")
+    print("Product search arguments:")
+    for key, value in json.loads(args).items():
+        print(f"{key}: '{value}'")
+    print("\n\n")
+```
+```python
+for ex in example_inputs:
+    ex['result'] = get_response(ex['user_input'], ex['context'])
+```
+```python
+for ex in example_inputs:
+    print_tool_call(ex['user_input'], ex['context'], ex['result'])
+```
+
+***NOTE: Structured Outputs is only available with gpt-4o-mini , gpt-4o-2024-08-06, and future models.***
+
+
+# Structured Outputs for Multi-Agent Systems
+Structured Outputs is a new capability that builds upon JSON mode and function calling to enforce a strict schema in a model output.
+
+By using the new parameter strict: true, we are able to guarantee the response abides by a provided schema.
+
+To demonstrate the power of this feature, we will use it to build a multi-agent system.
+## Why build a Multi-Agent System?
+
+When using function calling, if the number of functions (or tools) increases, the performance may suffer.
+
+To mitigate this, we can logically group the tools together and have specialized "agents" that are able to solve specific tasks or sub-tasks, which will increase the overall system performance.
+## Environment set up
+
+```python
+from openai import OpenAI
+from IPython.display import Image
+import json
+import pandas as pd
+import matplotlib.pyplot as plt
+from io import StringIO
+import numpy as np
+client = OpenAI()
+```
+    MODEL = "gpt-4o-2024-08-06"
+
+## Agents set up
+
+The use case we will tackle is a data analysis task.
+
+Let's first set up our 4-agents system:
+
+    Triaging agent: Decides which agent(s) to call
+    Data pre-processing Agent: Prepares data for analysis - for example by cleaning it up
+    Data Analysis Agent: Performs analysis on the data
+    Data Visualization Agent: Visualizes the output of the analysis to extract insights
+
+We will start by defining the system prompts for each of these agents.
+
+```python
+triaging_system_prompt = """You are a Triaging Agent. Your role is to assess the user's query and route it to the relevant agents. The agents available are:
+- Data Processing Agent: Cleans, transforms, and aggregates data.
+- Analysis Agent: Performs statistical, correlation, and regression analysis.
+- Visualization Agent: Creates bar charts, line charts, and pie charts.
+
+Use the send_query_to_agents tool to forward the user's query to the relevant agents. Also, use the speak_to_user tool to get more information from the user if needed."""
+
+processing_system_prompt = """You are a Data Processing Agent. Your role is to clean, transform, and aggregate data using the following tools:
+- clean_data
+- transform_data
+- aggregate_data"""
+
+analysis_system_prompt = """You are an Analysis Agent. Your role is to perform statistical, correlation, and regression analysis using the following tools:
+- stat_analysis
+- correlation_analysis
+- regression_analysis"""
+
+visualization_system_prompt = """You are a Visualization Agent. Your role is to create bar charts, line charts, and pie charts using the following tools:
+- create_bar_chart
+- create_line_chart
+- create_pie_chart"""
+```
+We will then define the tools for each agent.
+
+Apart from the triaging agent, each agent will be equipped with tools specific to their role:
+
+**Data pre-processing agent**
+
+1. Clean data
+2. Transform data
+3. Aggregate data
+
+**Data analysis agent**
+
+1. Statistical analysis
+2. Correlation analysis
+3. Regression Analysis
+
+**Data visualization agent**
+
+1. Create bar chart
+2. Create line chart
+3. Create pie chart
+
+```python
+triage_tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "send_query_to_agents",
+            "description": "Sends the user query to relevant agents based on their capabilities.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "agents": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "An array of agent names to send the query to."
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "The user query to send."
+                    }
+                },
+                "required": ["agents", "query"]
+            }
+        },
+        "strict": True
+    }
+]
+
+preprocess_tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "clean_data",
+            "description": "Cleans the provided data by removing duplicates and handling missing values.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "string",
+                        "description": "The dataset to clean. Should be in a suitable format such as JSON or CSV."
+                    }
+                },
+                "required": ["data"],
+                "additionalProperties": False
+            }
+        },
+        "strict": True
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "transform_data",
+            "description": "Transforms data based on specified rules.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "string",
+                        "description": "The data to transform. Should be in a suitable format such as JSON or CSV."
+                    },
+                    "rules": {
+                        "type": "string",
+                        "description": "Transformation rules to apply, specified in a structured format."
+                    }
+                },
+                "required": ["data", "rules"],
+                "additionalProperties": False
+            }
+        },
+        "strict": True
+
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "aggregate_data",
+            "description": "Aggregates data by specified columns and operations.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "string",
+                        "description": "The data to aggregate. Should be in a suitable format such as JSON or CSV."
+                    },
+                    "group_by": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Columns to group by."
+                    },
+                    "operations": {
+                        "type": "string",
+                        "description": "Aggregation operations to perform, specified in a structured format."
+                    }
+                },
+                "required": ["data", "group_by", "operations"],
+                "additionalProperties": False
+            }
+        },
+        "strict": True
+    }
+]
+
+
+analysis_tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "stat_analysis",
+            "description": "Performs statistical analysis on the given dataset.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "string",
+                        "description": "The dataset to analyze. Should be in a suitable format such as JSON or CSV."
+                    }
+                },
+                "required": ["data"],
+                "additionalProperties": False
+            }
+        },
+        "strict": True
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "correlation_analysis",
+            "description": "Calculates correlation coefficients between variables in the dataset.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "string",
+                        "description": "The dataset to analyze. Should be in a suitable format such as JSON or CSV."
+                    },
+                    "variables": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of variables to calculate correlations for."
+                    }
+                },
+                "required": ["data", "variables"],
+                "additionalProperties": False
+            }
+        },
+        "strict": True
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "regression_analysis",
+            "description": "Performs regression analysis on the dataset.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "string",
+                        "description": "The dataset to analyze. Should be in a suitable format such as JSON or CSV."
+                    },
+                    "dependent_var": {
+                        "type": "string",
+                        "description": "The dependent variable for regression."
+                    },
+                    "independent_vars": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of independent variables."
+                    }
+                },
+                "required": ["data", "dependent_var", "independent_vars"],
+                "additionalProperties": False
+            }
+        },
+        "strict": True
+    }
+]
+
+visualization_tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "create_bar_chart",
+            "description": "Creates a bar chart from the provided data.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "string",
+                        "description": "The data for the bar chart. Should be in a suitable format such as JSON or CSV."
+                    },
+                    "x": {
+                        "type": "string",
+                        "description": "Column for the x-axis."
+                    },
+                    "y": {
+                        "type": "string",
+                        "description": "Column for the y-axis."
+                    }
+                },
+                "required": ["data", "x", "y"],
+                "additionalProperties": False
+            }
+        },
+        "strict": True
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_line_chart",
+            "description": "Creates a line chart from the provided data.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "string",
+                        "description": "The data for the line chart. Should be in a suitable format such as JSON or CSV."
+                    },
+                    "x": {
+                        "type": "string",
+                        "description": "Column for the x-axis."
+                    },
+                    "y": {
+                        "type": "string",
+                        "description": "Column for the y-axis."
+                    }
+                },
+                "required": ["data", "x", "y"],
+                "additionalProperties": False
+            }
+        },
+        "strict": True
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_pie_chart",
+            "description": "Creates a pie chart from the provided data.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "string",
+                        "description": "The data for the pie chart. Should be in a suitable format such as JSON or CSV."
+                    },
+                    "labels": {
+                        "type": "string",
+                        "description": "Column for the labels."
+                    },
+                    "values": {
+                        "type": "string",
+                        "description": "Column for the values."
+                    }
+                },
+                "required": ["data", "labels", "values"],
+                "additionalProperties": False
+            }
+        },
+        "strict": True
+    }
+]
+```
+## Tool execution
+
+We need to write the code logic to:
+
+- handle passing the user query to the multi-agent system
+- handle the internal workings of the multi-agent system
+- execute the tool calls
+
+For the sake of brevity, we will only define the logic for tools that are relevant to the user query.
+
+```python
+# Example query
+
+user_query = """
+Below is some data. I want you to first remove the duplicates then analyze the statistics of the data as well as plot a line chart.
+
+house_size (m3), house_price ($)
+90, 100
+80, 90
+100, 120
+90, 100
+"""
+```
+From the user query, we can infer that the tools we would need to call are clean_data, start_analysis and use_line_chart.
+
+We will first define the execution function which runs tool calls.
+
+This maps a tool call to the corresponding function. It then appends the output of the function to the conversation history.
+
+```python
+def clean_data(data):
+    data_io = StringIO(data)
+    df = pd.read_csv(data_io, sep=",")
+    df_deduplicated = df.drop_duplicates()
+    return df_deduplicated
+
+def stat_analysis(data):
+    data_io = StringIO(data)
+    df = pd.read_csv(data_io, sep=",")
+    return df.describe()
+
+def plot_line_chart(data):
+    data_io = StringIO(data)
+    df = pd.read_csv(data_io, sep=",")
+    
+    x = df.iloc[:, 0]
+    y = df.iloc[:, 1]
+    
+    coefficients = np.polyfit(x, y, 1)
+    polynomial = np.poly1d(coefficients)
+    y_fit = polynomial(x)
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(x, y, 'o', label='Data Points')
+    plt.plot(x, y_fit, '-', label='Best Fit Line')
+    plt.title('Line Chart with Best Fit Line')
+    plt.xlabel(df.columns[0])
+    plt.ylabel(df.columns[1])
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+# Define the function to execute the tools
+def execute_tool(tool_calls, messages):
+    for tool_call in tool_calls:
+        tool_name = tool_call.function.name
+        tool_arguments = json.loads(tool_call.function.arguments)
+
+        if tool_name == 'clean_data':
+            # Simulate data cleaning
+            cleaned_df = clean_data(tool_arguments['data'])
+            cleaned_data = {"cleaned_data": cleaned_df.to_dict()}
+            messages.append({"role": "tool", "name": tool_name, "content": json.dumps(cleaned_data)})
+            print('Cleaned data: ', cleaned_df)
+        elif tool_name == 'transform_data':
+            # Simulate data transformation
+            transformed_data = {"transformed_data": "sample_transformed_data"}
+            messages.append({"role": "tool", "name": tool_name, "content": json.dumps(transformed_data)})
+        elif tool_name == 'aggregate_data':
+            # Simulate data aggregation
+            aggregated_data = {"aggregated_data": "sample_aggregated_data"}
+            messages.append({"role": "tool", "name": tool_name, "content": json.dumps(aggregated_data)})
+        elif tool_name == 'stat_analysis':
+            # Simulate statistical analysis
+            stats_df = stat_analysis(tool_arguments['data'])
+            stats = {"stats": stats_df.to_dict()}
+            messages.append({"role": "tool", "name": tool_name, "content": json.dumps(stats)})
+            print('Statistical Analysis: ', stats_df)
+        elif tool_name == 'correlation_analysis':
+            # Simulate correlation analysis
+            correlations = {"correlations": "sample_correlations"}
+            messages.append({"role": "tool", "name": tool_name, "content": json.dumps(correlations)})
+        elif tool_name == 'regression_analysis':
+            # Simulate regression analysis
+            regression_results = {"regression_results": "sample_regression_results"}
+            messages.append({"role": "tool", "name": tool_name, "content": json.dumps(regression_results)})
+        elif tool_name == 'create_bar_chart':
+            # Simulate bar chart creation
+            bar_chart = {"bar_chart": "sample_bar_chart"}
+            messages.append({"role": "tool", "name": tool_name, "content": json.dumps(bar_chart)})
+        elif tool_name == 'create_line_chart':
+            # Simulate line chart creation
+            line_chart = {"line_chart": "sample_line_chart"}
+            messages.append({"role": "tool", "name": tool_name, "content": json.dumps(line_chart)})
+            plot_line_chart(tool_arguments['data'])
+        elif tool_name == 'create_pie_chart':
+            # Simulate pie chart creation
+            pie_chart = {"pie_chart": "sample_pie_chart"}
+            messages.append({"role": "tool", "name": tool_name, "content": json.dumps(pie_chart)})
+    return messages
+```
+Next, we will create the tool handlers for each of the sub-agents.
+
+These have a unique prompt and tool set passed to the model.
+
+The output is then passed to an execution function which runs the tool calls.
+
+We will also append the messages to the conversation history.
+```python
+# Define the functions to handle each agent's processing
+def handle_data_processing_agent(query, conversation_messages):
+    messages = [{"role": "system", "content": processing_system_prompt}]
+    messages.append({"role": "user", "content": query})
+
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=messages,
+        temperature=0,
+        tools=preprocess_tools,
+    )
+
+    conversation_messages.append([tool_call.function for tool_call in response.choices[0].message.tool_calls])
+    execute_tool(response.choices[0].message.tool_calls, conversation_messages)
+
+def handle_analysis_agent(query, conversation_messages):
+    messages = [{"role": "system", "content": analysis_system_prompt}]
+    messages.append({"role": "user", "content": query})
+
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=messages,
+        temperature=0,
+        tools=analysis_tools,
+    )
+
+    conversation_messages.append([tool_call.function for tool_call in response.choices[0].message.tool_calls])
+    execute_tool(response.choices[0].message.tool_calls, conversation_messages)
+
+def handle_visualization_agent(query, conversation_messages):
+    messages = [{"role": "system", "content": visualization_system_prompt}]
+    messages.append({"role": "user", "content": query})
+
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=messages,
+        temperature=0,
+        tools=visualization_tools,
+    )
+
+    conversation_messages.append([tool_call.function for tool_call in response.choices[0].message.tool_calls])
+    execute_tool(response.choices[0].message.tool_calls, conversation_messages)
+```
+Finally, we create the overarching tool to handle processing the user query.
+
+This function takes the user query, gets a response from the model and handles passing it to the other agents to execute. In addition to this, we will keep the state of the ongoing conversation.
+
+```python
+# Function to handle user input and triaging
+def handle_user_message(user_query, conversation_messages=[]):
+    user_message = {"role": "user", "content": user_query}
+    conversation_messages.append(user_message)
+
+
+    messages = [{"role": "system", "content": triaging_system_prompt}]
+    messages.extend(conversation_messages)
+
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=messages,
+        temperature=0,
+        tools=triage_tools,
+    )
+
+    conversation_messages.append([tool_call.function for tool_call in response.choices[0].message.tool_calls])
+
+    for tool_call in response.choices[0].message.tool_calls:
+        if tool_call.function.name == 'send_query_to_agents':
+            agents = json.loads(tool_call.function.arguments)['agents']
+            query = json.loads(tool_call.function.arguments)['query']
+            for agent in agents:
+                if agent == "Data Processing Agent":
+                    handle_data_processing_agent(query, conversation_messages)
+                elif agent == "Analysis Agent":
+                    handle_analysis_agent(query, conversation_messages)
+                elif agent == "Visualization Agent":
+                    handle_visualization_agent(query, conversation_messages)
+
+    return conversation_messages
+```
+
+## Multi-agent system execution
+
+Finally, we run the overarching handle_user_message function on the user query and view the output.
+
+    handle_user_message(user_query)
+
+
+# How to stream completions
+
+By default, when you request a completion from the OpenAI, the entire completion is generated before being sent back in a single response.
+
+If you're generating long completions, waiting for the response can take many seconds.
+
+To get responses sooner, you can 'stream' the completion as it's being generated. This allows you to start printing or processing the beginning of the completion before the full completion is finished.
+
+To stream completions, set stream=True when calling the chat completions or completions endpoints. This will return an object that streams back the response as data-only server-sent events. Extract chunks from the delta field rather than the message field.
+
+
+## Downsides
+Note that using stream=True in a production application makes it more difficult to moderate the content of the completions, as partial completions may be more difficult to evaluate. This may have implications for approved usage.
+
+
+## Example code
+
+Below, this notebook shows:
+
+- What a typical chat completion response looks like
+- What a streaming chat completion response looks like
+- How much time is saved by streaming a chat completion
+- How to get token usage data for streamed chat completion response
+
+```
+!pip install openai
+```
+```python
+# imports
+import time  # for measuring time duration of API calls
+from openai import OpenAI
+import os
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "<your OpenAI API key if not set as env var>"))
+```
+
+ ## 1. What a typical chat completion response looks like
+
+With a typical ChatCompletions API call, the response is first computed and then returned all at once.
+
+```python
+# Example of an OpenAI ChatCompletion request
+# https://platform.openai.com/docs/guides/text-generation/chat-completions-api
+
+# record the time before the request is sent
+start_time = time.time()
+
+# send a ChatCompletion request to count to 100
+response = client.chat.completions.create(
+    model='gpt-4o-mini',
+    messages=[
+        {'role': 'user', 'content': 'Count to 100, with a comma between each number and no newlines. E.g., 1, 2, 3, ...'}
+    ],
+    temperature=0,
+)
+# calculate the time it took to receive the response
+response_time = time.time() - start_time
+
+# print the time delay and text received
+print(f"Full response received {response_time:.2f} seconds after request")
+print(f"Full response received:\n{response}")
+```
+
+The reply can be extracted with response.choices[0].message.
+
+The content of the reply can be extracted with response.choices[0].message.content.
+
+```python
+reply = response.choices[0].message
+print(f"Extracted reply: \n{reply}")
+
+reply_content = response.choices[0].message.content
+print(f"Extracted content: \n{reply_content}")
+```
+
+## 2. How to stream a chat completion
+With a streaming API call, the response is sent back incrementally in chunks via an event stream. In Python, you can iterate over these events with a for loop.
+
+Let's see what it looks like:
+
+```python
+# Example of an OpenAI ChatCompletion request with stream=True
+# https://platform.openai.com/docs/api-reference/streaming#chat/create-stream
+
+# a ChatCompletion request
+response = client.chat.completions.create(
+    model='gpt-4o-mini',
+    messages=[
+        {'role': 'user', 'content': "What's 1+1? Answer in one word."}
+    ],
+    temperature=0,
+    stream=True  # this time, we set stream=True
+)
+
+for chunk in response:
+    print(chunk)
+    print(chunk.choices[0].delta.content)
+    print("****************")
+```
+
+As you can see above, streaming responses have a delta field rather than a message field. delta can hold things like:
+
+- a role token (e.g., {"role": "assistant"})
+- a content token (e.g., {"content": "\n\n"})
+- nothing (e.g., {}), when the stream is over
+
+## 3. How much time is saved by streaming a chat completion
+
+Now let's ask gpt-4o-mini to count to 100 again, and see how long it takes.
+
+```python
+# Example of an OpenAI ChatCompletion request with stream=True
+# https://platform.openai.com/docs/api-reference/streaming#chat/create-stream
+
+# record the time before the request is sent
+start_time = time.time()
+
+# send a ChatCompletion request to count to 100
+response = client.chat.completions.create(
+    model='gpt-4o-mini',
+    messages=[
+        {'role': 'user', 'content': 'Count to 100, with a comma between each number and no newlines. E.g., 1, 2, 3, ...'}
+    ],
+    temperature=0,
+    stream=True  # again, we set stream=True
+)
+# create variables to collect the stream of chunks
+collected_chunks = []
+collected_messages = []
+# iterate through the stream of events
+for chunk in response:
+    chunk_time = time.time() - start_time  # calculate the time delay of the chunk
+    collected_chunks.append(chunk)  # save the event response
+    chunk_message = chunk.choices[0].delta.content  # extract the message
+    collected_messages.append(chunk_message)  # save the message
+    print(f"Message received {chunk_time:.2f} seconds after request: {chunk_message}")  # print the delay and text
+
+# print the time delay and text received
+print(f"Full response received {chunk_time:.2f} seconds after request")
+# clean None in collected_messages
+collected_messages = [m for m in collected_messages if m is not None]
+full_reply_content = ''.join(collected_messages)
+print(f"Full conversation received: {full_reply_content}")
+```
+
+## 4. How to get token usage data for streamed chat completion response
+
+You can get token usage statistics for your streamed response by setting stream_options={"include_usage": True}. When you do so, an extra chunk will be streamed as the final chunk. You can access the usage data for the entire request via the usage field on this chunk. A few important notes when you set stream_options={"include_usage": True}:
+
+- The value for the usage field on all chunks except for the last one will be null.
+- The usage field on the last chunk contains token usage statistics for the entire request.
+- The choices field on the last chunk will always be an empty array [].
+
+Let's see how it works using the example in 2.
+
+```python
+# Example of an OpenAI ChatCompletion request with stream=True and stream_options={"include_usage": True}
+
+# a ChatCompletion request
+response = client.chat.completions.create(
+    model='gpt-4o-mini',
+    messages=[
+        {'role': 'user', 'content': "What's 1+1? Answer in one word."}
+    ],
+    temperature=0,
+    stream=True,
+    stream_options={"include_usage": True}, # retrieving token usage for stream response
+)
+
+for chunk in response:
+    print(f"choices: {chunk.choices}\nusage: {chunk.usage}")
+```
+
+# Processing and narrating a video with GPT's visual capabilities and the TTS API
+
+This notebook demonstrates how to use GPT's visual capabilities with a video. GPT-4o doesn't take videos as input directly, but we can use vision and the 128K context window to describe the static frames of a whole video at once. We'll walk through two examples:
+
+1. Using GPT-4o to get a description of a video
+2. Generating a voiceover for a video with GPT-o and the TTS API
+
+## Setup
+    %pip install openai -U
+    
+```python
+from IPython.display import display, Image, Audio
+
+import cv2  # We're using OpenCV to read video, to install !pip install opencv-python
+import base64
+import time
+from openai import OpenAI
+import os
+import requests
+
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "<your OpenAI API key if not set as env var>"))
+```
+
+## 1. Using GPT's visual capabilities to get a description of a video
+
+First, we use OpenCV to extract frames from a nature video containing bisons and wolves:
+
+```python
+video = cv2.VideoCapture("data/bison.mp4")
+
+base64Frames = []
+while video.isOpened():
+    success, frame = video.read()
+    if not success:
+        break
+    _, buffer = cv2.imencode(".jpg", frame)
+    base64Frames.append(base64.b64encode(buffer).decode("utf-8"))
+
+video.release()
+print(len(base64Frames), "frames read.")
+```
+Display frames to make sure we've read them in correctly:
+
+```python
+display_handle = display(None, display_id=True)
+for img in base64Frames:
+    display_handle.update(Image(data=base64.b64decode(img.encode("utf-8"))))
+    time.sleep(0.025)
+```
+Once we have the video frames, we craft our prompt and send a request to GPT (Note that we don't need to send every frame for GPT to understand what's going on):
+
+```python
+PROMPT_MESSAGES = [
+    {
+        "role": "user",
+        "content": [
+            "These are frames from a video that I want to upload. Generate a compelling description that I can upload along with the video.",
+            *map(lambda x: {"image": x, "resize": 768}, base64Frames[0::50]),
+        ],
+    },
+]
+params = {
+    "model": "gpt-4o",
+    "messages": PROMPT_MESSAGES,
+    "max_tokens": 200,
+}
+
+result = client.chat.completions.create(**params)
+print(result.choices[0].message.content)
+```
+## 2. Generating a voiceover for a video with GPT-4 and the TTS API
+Let's create a voiceover for this video in the style of David Attenborough. Using the same video frames we prompt GPT to give us a short script:
+
+```python
+PROMPT_MESSAGES = [
+    {
+        "role": "user",
+        "content": [
+            "These are frames of a video. Create a short voiceover script in the style of David Attenborough. Only include the narration.",
+            *map(lambda x: {"image": x, "resize": 768}, base64Frames[0::60]),
+        ],
+    },
+]
+params = {
+    "model": "gpt-4o",
+    "messages": PROMPT_MESSAGES,
+    "max_tokens": 500,
+}
+
+result = client.chat.completions.create(**params)
+print(result.choices[0].message.content)
+```
+Now we can pass the script to the TTS API where it will generate an mp3 of the voiceover:
+
+```python
+response = requests.post(
+    "https://api.openai.com/v1/audio/speech",
+    headers={
+        "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
+    },
+    json={
+        "model": "tts-1-1106",
+        "input": result.choices[0].message.content,
+        "voice": "onyx",
+    },
+)
+
+audio = b""
+for chunk in response.iter_content(chunk_size=1024 * 1024):
+    audio += chunk
+Audio(audio)
+```
