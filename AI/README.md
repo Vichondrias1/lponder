@@ -89,6 +89,24 @@
   - [Setup](#setup-2)
   - [1. Using GPT's visual capabilities to get a description of a video](#1-using-gpts-visual-capabilities-to-get-a-description-of-a-video)
   - [2. Generating a voiceover for a video with GPT-4 and the TTS API](#2-generating-a-voiceover-for-a-video-with-gpt-4-and-the-tts-api)
+- [GPT4o mini with RAG](#gpt4o-mini-with-rag)
+  - [How to combine GPT4o mini with RAG to create a clothing matchmaker app](#how-to-combine-gpt4o-mini-with-rag-to-create-a-clothing-matchmaker-app)
+  - [Environment Setup](#environment-setup)
+    - [Creating the Embeddings](#creating-the-embeddings)
+    - [Two options for creating the embeddings:](#two-options-for-creating-the-embeddings)
+    - [Building the Matching Algorithm](#building-the-matching-algorithm)
+    - [Analysis Module](#analysis-module)
+    - [Testing the Prompt with Sample Images](#testing-the-prompt-with-sample-images)
+  - [Guardrails](#guardrails)
+- [Install and Run FLUX.1-schnell text to Image Model in Python(Linux)](#install-and-run-flux1-schnell-text-to-image-model-in-pythonlinux)
+  - [Software/Hardware prerequisites:](#softwarehardware-prerequisites)
+  - [Download the flux1 schnell repository from hugging face](#download-the-flux1-schnell-repository-from-hugging-face)
+  - [Step 1 Create a virtual environment](#step-1-create-a-virtual-environment)
+  - [Step 2 Create a file download.py inside your virtual environment](#step-2-create-a-file-downloadpy-inside-your-virtual-environment)
+  - [Step 3 run download.py](#step-3-run-downloadpy)
+  - [Step 4 Install the necessary packages.](#step-4-install-the-necessary-packages)
+  - [Step 5 Create the python file flux schnell](#step-5-create-the-python-file-flux-schnell)
+  - [Step 6 Run the code](#step-6-run-the-code)
 
 
 # Open Web UI
@@ -2750,3 +2768,571 @@ for chunk in response.iter_content(chunk_size=1024 * 1024):
     audio += chunk
 Audio(audio)
 ```
+
+# GPT4o mini with RAG
+## How to combine GPT4o mini with RAG to create a clothing matchmaker app
+
+GPT-4o mini is a small model that combines natural language processing with image recognition, allowing it to understand and generate responses based on both text and visual inputs with low latency.
+
+Building on the capabilities of the GPT-4o mini model, we employ a custom matching algorithm and the RAG technique to search our knowledge base for items that complement the identified features. This algorithm takes into account factors like color compatibility and style coherence to provide users with suitable recommendations. Through this notebook, we aim to showcase the practical application of these technologies in creating a clothing recommendation system.
+
+Using the combination of GPT-4o mini + RAG (Retrieval-Augmented Generation) offers several advantages:
+
+1. **Contextual Understanding**: GPT-4o mini can analyze input images and understand the context, such as the objects, scenes, and activities depicted. This allows for more accurate and relevant suggestions or information across various domains, whether it's interior design, cooking, or education.
+2. **Rich Knowledge Base**: RAG combines the generative capabilities of GPT-4 with a retrieval component that accesses a large corpus of information across different fields. This means the system can provide suggestions or insights based on a wide range of knowledge, from historical facts to scientific concepts.
+3. **Customization**: The approach allows for easy customization to cater to specific user needs or preferences in various applications. Whether it's tailoring suggestions to a user's taste in art or providing educational content based on a student's learning level, the system can be adapted to deliver personalized experiences.
+
+Overall, the GPT-4o mini + RAG approach offers a fast, powerful, and flexible solution for various fashion-related applications, leveraging the strengths of both generative and retrieval-based AI techniques.
+
+## Environment Setup
+
+First we will install the necessary dependencies, then import the libraries and write some utility functions that we will use later on.
+
+
+```
+%pip install openai --quiet
+%pip install tenacity --quiet
+%pip install tqdm --quiet
+%pip install numpy --quiet
+%pip install typing --quiet
+%pip install tiktoken --quiet
+# %pip install concurent --quiet  had to replace this library since it not the latest. Used futures instead refer to this for more info. https://pypi.org/project/futures/
+%pip install futures --quiet
+```
+```python
+import pandas as pd
+import numpy as np
+import json
+import ast
+import tiktoken
+import concurrent
+from openai import OpenAI
+from tqdm import tqdm
+from tenacity import retry, wait_random_exponential, stop_after_attempt
+from IPython.display import Image, display, HTML
+from typing import List
+
+client = OpenAI()
+
+GPT_MODEL = "gpt-4o-mini"
+EMBEDDING_MODEL = "text-embedding-3-large"
+EMBEDDING_COST_PER_1K_TOKENS = 0.00013
+```
+### Creating the Embeddings
+
+We will now set up the knowledge base by choosing a database and generating embeddings for it. I am using the sample_styles.csv file for this in the data folder. This is a sample of a bigger dataset that contains ~44K items. This step can also be replaced by using an out-of-the-box vector database. For example, you can follow one of these cookbooks to set up your vector database.
+
+```python
+styles_filepath = "data/sample_clothes/sample_styles.csv"
+styles_df = pd.read_csv(styles_filepath, on_bad_lines='skip')
+print(styles_df.head())
+print("Opened dataset successfully. Dataset has {} items of clothing.".format(len(styles_df)))
+
+```
+Now we will generate embeddings for the entire dataset. We can parallelize the execution of these embeddings to ensure that the script scales up for larger datasets. With this logic, the time to create embeddings for the full 44K entry dataset decreases from ~4h to ~2-3min.
+
+```python
+## Batch Embedding Logic
+
+# Simple function to take in a list of text objects and return them as a list of embeddings
+@retry(wait=wait_random_exponential(min=1, max=40), stop=stop_after_attempt(10))
+def get_embeddings(input: List):
+    response = client.embeddings.create(
+        input=input,
+        model=EMBEDDING_MODEL
+    ).data
+    return [data.embedding for data in response]
+
+
+# Splits an iterable into batches of size n.
+def batchify(iterable, n=1):
+    l = len(iterable)
+    for ndx in range(0, l, n):
+        yield iterable[ndx : min(ndx + n, l)]
+     
+
+# Function for batching and parallel processing the embeddings
+def embed_corpus(
+    corpus: List[str],
+    batch_size=64,
+    num_workers=8,
+    max_context_len=8191,
+):
+    # Encode the corpus, truncating to max_context_len
+    encoding = tiktoken.get_encoding("cl100k_base")
+    encoded_corpus = [
+        encoded_article[:max_context_len] for encoded_article in encoding.encode_batch(corpus)
+    ]
+
+    # Calculate corpus statistics: the number of inputs, the total number of tokens, and the estimated cost to embed
+    num_tokens = sum(len(article) for article in encoded_corpus)
+    cost_to_embed_tokens = num_tokens / 1000 * EMBEDDING_COST_PER_1K_TOKENS
+    print(
+        f"num_articles={len(encoded_corpus)}, num_tokens={num_tokens}, est_embedding_cost={cost_to_embed_tokens:.2f} USD"
+    )
+
+    # Embed the corpus
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+        
+        futures = [
+            executor.submit(get_embeddings, text_batch)
+            for text_batch in batchify(encoded_corpus, batch_size)
+        ]
+
+        with tqdm(total=len(encoded_corpus)) as pbar:
+            for _ in concurrent.futures.as_completed(futures):
+                pbar.update(batch_size)
+
+        embeddings = []
+        for future in futures:
+            data = future.result()
+            embeddings.extend(data)
+
+        return embeddings
+    
+
+# Function to generate embeddings for a given column in a DataFrame
+def generate_embeddings(df, column_name):
+    # Initialize an empty list to store embeddings
+    descriptions = df[column_name].astype(str).tolist()
+    embeddings = embed_corpus(descriptions)
+
+    # Add the embeddings as a new column to the DataFrame
+    df['embeddings'] = embeddings
+    print("Embeddings created successfully.")
+```
+### Two options for creating the embeddings:
+
+The next line will create the embeddings for the sample clothes dataset. This will take around 0.02s to process and another ~30s to write the results to a local .csv file. The process is using our text_embedding_3_large model which is priced at $0.00013/1K tokens. Given that the dataset has around 1K entries, the following operation will cost approximately $0.001. If you decide to work with the entire dataset of 44K entries, this operation will take 2-3min to process and it will cost approximately $0.07.
+
+**If you would not like to proceed with creating your own embeddings**, we will use a dataset of pre-computed embeddings. You can skip this cell and uncomment the code in the following cell to proceed with loading the pre-computed vectors. This operation takes ~1min to load all the data in memory.
+
+
+```python
+generate_embeddings(styles_df, 'productDisplayName')
+print("Writing embeddings to file ...")
+styles_df.to_csv('/content/sample_data/sample_styles_with_embeddings.csv', index=False)
+print("Embeddings successfully stored in sample_styles_with_embeddings.csv")
+```
+
+```python
+# styles_df = pd.read_csv('data/sample_clothes/sample_styles_with_embeddings.csv', on_bad_lines='skip')
+
+# # Convert the 'embeddings' column from string representations of lists to actual lists of floats
+# styles_df['embeddings'] = styles_df['embeddings'].apply(lambda x: ast.literal_eval(x))
+
+print(styles_df.head())
+print("Opened dataset successfully. Dataset has {} items of clothing along with their embeddings.".format(len(styles_df)))
+```
+
+### Building the Matching Algorithm
+
+In this section, we'll develop a cosine similarity retrieval algorithm to find similar items in our dataframe. We'll utilize our custom cosine similarity function for this purpose. While the sklearn library offers a built-in cosine similarity function, recent updates to its SDK have led to compatibility issues, prompting us to implement our own standard cosine similarity calculation.
+
+If you already have a vector database set up, you can skip this step. Most standard databases come with their own search functions, which simplify the subsequent steps outlined in this guide. However, we aim to demonstrate that the matching algorithm can be tailored to meet specific requirements, such as a particular threshold or a specified number of matches returned.
+
+The `find_similar_items` function accepts four parameters:
+
+ - `embedding`: The embedding for which we want to find a match.
+ - `embeddings`: A list of embeddings to search through for the best matches.
+ - `threshold` (optional): This parameter specifies the minimum similarity score for a match to be considered valid. A higher threshold results in closer (better) matches, while a lower threshold allows for more items to be returned, though they may not be as closely matched to the initial embedding.
+ - `top_k` (optional): This parameter determines the number of items to return that exceed the given threshold. These will be the top-scoring matches for the provided embedding.
+
+
+```python
+def cosine_similarity_manual(vec1, vec2):
+    """Calculate the cosine similarity between two vectors."""
+    vec1 = np.array(vec1, dtype=float)
+    vec2 = np.array(vec2, dtype=float)
+
+
+    dot_product = np.dot(vec1, vec2)
+    norm_vec1 = np.linalg.norm(vec1)
+    norm_vec2 = np.linalg.norm(vec2)
+    return dot_product / (norm_vec1 * norm_vec2)
+
+
+def find_similar_items(input_embedding, embeddings, threshold=0.5, top_k=2):
+    """Find the most similar items based on cosine similarity."""
+    
+    # Calculate cosine similarity between the input embedding and all other embeddings
+    similarities = [(index, cosine_similarity_manual(input_embedding, vec)) for index, vec in enumerate(embeddings)]
+    
+    # Filter out any similarities below the threshold
+    filtered_similarities = [(index, sim) for index, sim in similarities if sim >= threshold]
+    
+    # Sort the filtered similarities by similarity score
+    sorted_indices = sorted(filtered_similarities, key=lambda x: x[1], reverse=True)[:top_k]
+
+    # Return the top-k most similar items
+    return sorted_indices
+```
+```python
+def find_matching_items_with_rag(df_items, item_descs):
+   """Take the input item descriptions and find the most similar items based on cosine similarity for each description."""
+   
+   # Select the embeddings from the DataFrame.
+   embeddings = df_items['embeddings'].tolist()
+
+   
+   similar_items = []
+   for desc in item_descs:
+      
+      # Generate the embedding for the input item
+      input_embedding = get_embeddings([desc])
+    
+      # Find the most similar items based on cosine similarity
+      similar_indices = find_similar_items(input_embedding, embeddings, threshold=0.6)
+      similar_items += [df_items.iloc[i] for i in similar_indices]
+    
+   return similar_items
+```
+### Analysis Module
+
+In this module, we leverage `gpt-4o-mini`to analyze input images and extract important features like detailed descriptions, styles, and types. The analysis is performed through a straightforward API call, where we provide the URL of the image for analysis and request the model to identify relevant features.
+
+To ensure the model returns accurate results, we use specific techniques in our prompt:
+
+1. Output Format Specification: We instruct the model to return a JSON block with a predefined structure, consisting of:
+    - `items` (str[]): A list of strings, each representing a concise title for an item of clothing, including style, color, and gender. These titles closely resemble the `productDisplayName` property in our original database.
+    - `category` (str): The category that best represents the given item. The model selects from a list of all unique `articleTypes` present in the original styles dataframe.
+    - `gender` (str): A label indicating the gender the item is intended for. The model chooses from the options `[Men, Women, Boys, Girls, Unisex]`.
+
+2. Clear and Concise Instructions:
+    - We provide clear instructions on what the item titles should include and what the output format should be. The output should be in `JSON` format, but without the json tag that the model response normally contains.
+
+3. One Shot Example:
+        To further clarify the expected output, we provide the model with an example input description and a corresponding example output. Although this may increase the number of tokens used (and thus the cost of the call), it helps to guide the model and results in better overall performance.
+
+By following this structured approach, we aim to obtain precise and useful information from the `gpt-4o-mini` model for further analysis and integration into our database.
+
+```python
+def analyze_image(image_base64, subcategories):
+    response = client.chat.completions.create(
+        model=GPT_MODEL,
+        messages=[
+            {
+            "role": "user",
+            "content": [
+                {
+                "type": "text",
+                "text": """Given an image of an item of clothing, analyze the item and generate a JSON output with the following fields: "items", "category", and "gender". 
+                           Use your understanding of fashion trends, styles, and gender preferences to provide accurate and relevant suggestions for how to complete the outfit.
+                           The items field should be a list of items that would go well with the item in the picture. Each item should represent a title of an item of clothing that contains the style, color, and gender of the item.
+                           The category needs to be chosen between the types in this list: {subcategories}.
+                           You have to choose between the genders in this list: [Men, Women, Boys, Girls, Unisex]
+                           Do not include the description of the item in the picture. Do not include the ```json ``` tag in the output.
+                           
+                           Example Input: An image representing a black leather jacket.
+
+                           Example Output: {"items": ["Fitted White Women's T-shirt", "White Canvas Sneakers", "Women's Black Skinny Jeans"], "category": "Jackets", "gender": "Women"}
+                           """,
+                },
+                {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{image_base64}",
+                },
+                }
+            ],
+            }
+        ]
+    )
+    # Extract relevant features from the response
+    features = response.choices[0].message.content
+    return features
+```
+### Testing the Prompt with Sample Images
+
+To evaluate the effectiveness of our prompt, let's load and test it with a selection of images from our dataset. We'll use images from the `"/content/sample_clothes"` folder, ensuring a variety of styles, genders, and types. Here are the chosen samples:
+
+- `2133.jpg`: Men's shirt
+- `7143.jpg`: Women's shirt
+- `4226.jpg`: Casual men's printed t-shirt
+
+By testing the prompt with these diverse images, we can assess its ability to accurately analyze and extract relevant features from different types of clothing items and accessories.
+
+We need a utility function to encode the .jpg images in base64
+
+```python
+import base64
+
+def encode_image_to_base64(image_path):
+    with open(image_path, 'rb') as image_file:
+        encoded_image = base64.b64encode(image_file.read())
+        return encoded_image.decode('utf-8')
+```
+```python
+# Set the path to the images and select a test image
+image_path = "/content/sample_clothes/"
+test_images = ["2133.jpg", "7143.jpg", "4226.jpg"]
+
+# Encode the test image to base64
+reference_image = image_path + test_images[0]
+encoded_image = encode_image_to_base64(reference_image)
+```
+```python
+# Select the unique subcategories from the DataFrame
+unique_subcategories = styles_df['articleType'].unique()
+
+# Analyze the image and return the results
+analysis = analyze_image(encoded_image, unique_subcategories)
+image_analysis = json.loads(analysis)
+
+# Display the image and the analysis results
+display(Image(filename=reference_image))
+print(image_analysis)
+```
+Next, we process the output from the image analysis and use it to filter and display matching items from our dataset. Here's a breakdown of the code:
+
+1. **Extracting Image Analysis Results**: We extract the item descriptions, category, and gender from the `image_analysis` dictionary.
+
+2. **Filtering the Dataset**: We filter the `styles_df` DataFrame to include only items that match the gender from the image analysis (or are unisex) and exclude items of the same category as the analyzed image.
+
+3. **Finding Matching Items**: We use the `find_matching_items_with_rag` function to find items in the filtered dataset that match the descriptions extracted from the analyzed image.
+
+4. **Displaying Matching Items**: We create an HTML string to display images of the matching items. We construct the image paths using the item IDs and append each image to the HTML string. Finally, we use `display(HTML(html))` to render the images in the notebook.
+
+This cell effectively demonstrates how to use the results of image analysis to filter a dataset and visually display items that match the analyzed image's characteristics.
+
+```python
+# Extract the relevant features from the analysis
+item_descs = image_analysis['items']
+item_category = image_analysis['category']
+item_gender = image_analysis['gender']
+
+
+# Filter data such that we only look through the items of the same gender (or unisex) and different category
+filtered_items = styles_df.loc[styles_df['gender'].isin([item_gender, 'Unisex'])]
+filtered_items = filtered_items[filtered_items['articleType'] != item_category]
+print(str(len(filtered_items)) + " Remaining Items")
+
+# Find the most similar items based on the input item descriptions
+matching_items = find_matching_items_with_rag(filtered_items, item_descs)
+
+# Display the matching items (this will display 2 items for each description in the image analysis)
+html = ""
+paths = []
+for i, item in enumerate(matching_items):
+    item_id = item['id']
+        
+    # Path to the image file
+    image_path = f'data/sample_clothes/sample_images/{item_id}.jpg'
+    paths.append(image_path)
+    html += f'<img src="{image_path}" style="display:inline;margin:1px"/>'
+
+# Print the matching item description as a reminder of what we are looking for
+print(item_descs)
+# Display the image
+display(HTML(html))
+```
+## Guardrails
+
+In the context of using Large Language Models (LLMs) like GPT-4o mini, "guardrails" refer to mechanisms or checks put in place to ensure that the model's output remains within desired parameters or boundaries. These guardrails are crucial for maintaining the quality and relevance of the model's responses, especially when dealing with complex or nuanced tasks.
+
+Guardrails are useful for several reasons:
+
+1. **Accuracy**: They help ensure that the model's output is accurate and relevant to the input provided.
+2. **Consistency**: They maintain consistency in the model's responses, especially when dealing with similar or related inputs.
+3. **Safety**: They prevent the model from generating harmful, offensive, or inappropriate content.
+4. **Contextual Relevance**: They ensure that the model's output is contextually relevant to the specific task or domain it is being used for.
+
+In our case, we are using GPT-4o mini to analyze fashion images and suggest items that would complement an original outfit. To implement guardrails, we can **refine results**: After obtaining initial suggestions from GPT-4o mini, we can send the original image and the suggested items back to the model. We can then ask GPT-4o mini to evaluate whether each suggested item would indeed be a good fit for the original outfit.
+
+This gives the model the ability to self-correct and adjust its own output based on feedback or additional information. By implementing these guardrails and enabling self-correction, we can enhance the reliability and usefulness of the model's output in the context of fashion analysis and recommendation.
+
+To facilitate this, we write a prompt that asks the LLM for a simple "yes" or "no" answer to the question of whether the suggested items match the original outfit or not. This binary response helps streamline the refinement process and ensures clear and actionable feedback from the model.
+
+```python
+def check_match(reference_image_base64, suggested_image_base64):
+    response = client.chat.completions.create(
+        model=GPT_MODEL,
+        messages=[
+            {
+            "role": "user",
+            "content": [
+                {
+                "type": "text",
+                "text": """ You will be given two images of two different items of clothing.
+                            Your goal is to decide if the items in the images would work in an outfit together.
+                            The first image is the reference item (the item that the user is trying to match with another item).
+                            You need to decide if the second item would work well with the reference item.
+                            Your response must be a JSON output with the following fields: "answer", "reason".
+                            The "answer" field must be either "yes" or "no", depending on whether you think the items would work well together.
+                            The "reason" field must be a short explanation of your reasoning for your decision. Do not include the descriptions of the 2 images.
+                            Do not include the ```json ``` tag in the output.
+                           """,
+                },
+                {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{reference_image_base64}",
+                },
+                },
+                {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{suggested_image_base64}",
+                },
+                }
+            ],
+            }
+        ],
+        max_tokens=300,
+    )
+    # Extract relevant features from the response
+    features = response.choices[0].message.content
+    return features
+```
+Finally, let's determine which of the items identified above truly complement the outfit.
+```python
+# Select the unique paths for the generated images
+paths = list(set(paths))
+
+for path in paths:
+    # Encode the test image to base64
+    suggested_image = encode_image_to_base64(path)
+    
+    # Check if the items match
+    match = json.loads(check_match(encoded_image, suggested_image))
+    
+    # Display the image and the analysis results
+    if match["answer"] == 'yes':
+        display(Image(filename=path))
+        print("The items match!")
+        print(match["reason"])
+```
+We can observe that the initial list of potential items has been further refined, resulting in a more curated selection that aligns well with the outfit. Additionally, the model provides explanations for why each item is considered a good match, offering valuable insights into the decision-making process.
+
+# Install and Run FLUX.1-schnell text to Image Model in Python(Linux)
+
+## Software/Hardware prerequisites:
+
+- Official webpage states that the FLUX.1[schnell] can be run locally. However, they do not specify the required GPU memory requirements and other specs, or if they did, we could not find the specs. If you just blindly run the script on the official Hugging Face website, you will see that the script will not run unless GPU has 60 GB VRAM available. However, you can actually run FLUX1.[schnell] on GPUs with less memory, by just adding a single line of code. We have tested FLUX1.[schnell] on NVIDIA 3090 with 24 GB VRAM and it takes around 30-60 seconds to generate an image. You can decrease this time by optimizing the code. More about this in our future video tutorials. To summarize, you will need a relatively modest GPU to run FLUX.1[schnell]. In the comment section below you can share with us your experiences in running FLUX.1[schnell] on different GPUs.
+
+## Download the flux1 schnell repository from hugging face
+Download Link : <a href="https://huggingface.co/black-forest-labs/FLUX.1-schnell/tree/main">Flux1. Schnell Repository</a>
+
+## Step 1 Create a virtual environment
+
+```
+mkdir flux1schnell
+cd flux1schnell
+python3 -m venv flux1
+source flux1/bin/activate
+```
+
+
+## Step 2 Create a file download.py inside your virtual environment
+  ```python
+  from huggingface_hub import snapshot_download
+
+    snapshot_download(repo_id="black-forest-labs/FLUX.1-schnell",
+                  local_dir="/home/liam/flux1schnell")
+  ```
+  Note: Change the path of local_dir to the actual path of your virtual environment. Just write `pwd` in your terminal to know the actual path.
+
+## Step 3 run download.py 
+
+- Press `CTRL + SHIFT + P`
+
+![alt text](../img/interpretor.png)
+
+- Type `Python: Select Interpreter`
+- Then Select the the `flux1` virtual environment
+![alt text](../img/flux1.png)
+- Click the button 
+![alt text](../img/runflux1.png)
+
+Note: When running this it takes 2 to 3hours (depending on the internet) to download all the files from the repository. The files is 26-27gb in total. If the download process stops run the download.py again. 
+
+## Step 4 Install the necessary packages.
+
+Install `setuptools` in the terminal.
+```
+pip install setuptools
+```
+
+Install `Pytorch` in the terminal.
+```
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
+Install `Transformers` in the terminal.
+```
+pip install --upgrade transformers 
+```
+
+Install `Accelerate` in the terminal.
+```
+pip install accelerate 
+```
+
+Install `Hugging Face` in the terminal.
+```
+pip install huggingface_hub
+```
+
+Install `Matplotlib` in the terminal.
+```
+pip install matplotlib 
+```
+
+Install `Diffusers` in the terminal.
+```
+pip install git+https://github.com/huggingface/diffusers.git 
+```
+
+Install `Sentencepiece` in the terminal.
+```
+pip install sentencepiece 
+```
+
+Install `Protobuf` in the terminal.
+```
+pip install protobuf 
+```
+
+## Step 5 Create the python file flux schnell
+
+Create a python file to run flux schenell example `test1.py`. See the code below.
+<br/>
+
+<b>Note: Change from_pretrained path with the actual path of your flux virtual environment.</b>
+
+```python
+import matplotlib.pyplot as plt
+import torch
+from diffusers import FluxPipeline
+
+# here, adjust the path
+pipe = FluxPipeline.from_pretrained("/home/liam/flux1schnell", torch_dtype=torch.bfloat16)
+#pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
+pipe.enable_sequential_cpu_offload() # offloads modules to CPU on a submodule level (rather than model level)
+
+prompt = "Ancient greek soldier with a sword and a shield. Behind there are horses. In the background there is a mountain with snow."
+
+image = pipe(
+    prompt,
+    guidance_scale=0.0,
+    output_type="pil",
+    num_inference_steps=4,
+    max_sequence_length=256,
+    generator=torch.Generator("cpu").manual_seed(0)
+).images[0]
+
+
+plt.imshow(image)
+plt.show()
+image.save("generated_imag.png")
+```
+
+## Step 6 Run the code
+
+- Press `CTRL + SHIFT + P`
+- Type `Python: Select Interpreter`
+  
+<b>Note it will generate and image called `generated_imag.png`</b>
+![alt text](../img/runflux.gif)
+
+
