@@ -9,6 +9,7 @@
   - [Check the ban IPs](#check-the-ban-ips)
   - [Set Time Durations](#set-time-durations)
 - [Scrape ELS Website For PDF's and HTML Files](#scrape-els-website-for-pdfs-and-html-files)
+- [Setup Static Ip Address in Raspberry Pi](#setup-static-ip-address-in-raspberry-pi)
 
 # Copy file from server to NAS using rsync
 See the official documentation of <a href="https://linux.die.net/man/1/rsync" target="_blank">Rsync</a> here.
@@ -306,4 +307,51 @@ Here’s a line-by-line explanation:
 This code automates the process of scraping a news page, downloading PDF or HTML content, converting HTML to markdown, extracting text from PDFs, and saving all this information in a structured JSON format.
 
 
+# Setup Static Ip Address in Raspberry Pi
 
+1. Open Terminal.
+2. Edit the dhcpcd.conf File: Use a text editor (like nano) to edit the configuration file:
+    ```
+    sudo nano /etc/dhcpcd.conf
+    ```
+
+3. <b>Add Static IP Configuration</b>: Scroll down to the end of the file and add the following lines, modifying them according to your network settings:
+
+    - For Wifi Connection
+        ```
+            interface eth0
+            static ip_address=192.168.1.100/24    # Your desired static IP
+            static routers=192.168.1.1             # Your router's IP
+            static domain_name_servers=192.168.1.1 8.8.8.8  # Router's DNS and Google's DNS
+        ```
+
+    - For WLAN Connection
+        ```
+            interface wlan0
+            static ip_address=192.168.1.100/24    # Your desired static IP
+            static routers=192.168.1.1             # Your router's IP
+            static domain_name_servers=192.168.1.1 8.8.8.8  # Router's DNS and Google's DNS
+        ```
+4. <b>Save and Exit</b>: Press `CTRL + X`, then `Y`, and hit `Enter` to save the changes.
+
+5. Reboot the Raspberry Pi: Apply the changes by rebooting:
+    ```
+    sudo reboot
+    ```
+6. Add new Static Ip on your internet provider admin page
+
+   - Open http://192.168.254.254/public/public_info_page.asp, scroll down to 
+User Device Information and find the IP address there you can find the MAC Address beside it.
+    ![alt text](<../img/mac address.PNG>)
+
+    - Click Setup and provide your `Username` and `Password`.
+    ![alt text](../img/globelogin.PNG)
+
+   - Go to DHCP Static IP Configuration and click New
+        ![alt text](<../img/static ip.PNG>)
+
+   - Provide the static ip that you set in the `/etc/dhcpcd.conf`
+    ![alt text](<../img/static ip add.PNG>)
+
+
+    
