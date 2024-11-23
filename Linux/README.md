@@ -10,6 +10,27 @@
   - [Set Time Durations](#set-time-durations)
 - [Scrape ELS Website For PDF's and HTML Files](#scrape-els-website-for-pdfs-and-html-files)
 - [Setup Static Ip Address in Raspberry Pi](#setup-static-ip-address-in-raspberry-pi)
+- [Transfer Database from FTP Server(Linux)](#transfer-database-from-ftp-serverlinux)
+  - [1. Things to Install](#1-things-to-install)
+    - [Required Tools](#required-tools)
+  - [2. How to Set Up](#2-how-to-set-up)
+    - [Step 1: Prepare the Script and Configuration File](#step-1-prepare-the-script-and-configuration-file)
+    - [Step 2: Verify Configuration File](#step-2-verify-configuration-file)
+    - [Step 3: Create the Log File](#step-3-create-the-log-file)
+  - [3. How to Run the Shell Script](#3-how-to-run-the-shell-script)
+    - [Run the Script](#run-the-script)
+  - [4. How It Works](#4-how-it-works)
+  - [Code](#code)
+- [FTP File Download Script](#ftp-file-download-script)
+  - [Requirements](#requirements)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+    - [Configuration File (`config.json`)](#configuration-file-configjson)
+  - [Explanation](#explanation)
+  - [Local Directory](#local-directory)
+  - [USAGE](#usage)
+  - [Expected Output](#expected-output)
+  - [Check the Downloaded Files](#check-the-downloaded-files)
 
 # Copy file from server to NAS using rsync
 See the official documentation of <a href="https://linux.die.net/man/1/rsync" target="_blank">Rsync</a> here.
@@ -353,5 +374,474 @@ User Device Information and find the IP address there you can find the MAC Addre
    - Provide the static ip that you set in the `/etc/dhcpcd.conf`
     ![alt text](<../img/static ip add.PNG>)
 
+# Transfer Database from FTP Server(Linux)
 
+## 1. Things to Install
+To run this script, ensure you have the following tools and dependencies installed:
+
+### Required Tools
+1. Bash Shell: Comes pre-installed on most Linux distributions.
+2. `lftp`: A sophisticated command-line FTP/HTTP client.
+    ```
+    sudo apt-get install lftp
+    ```
+3. `jq`: A lightweight and flexible JSON processor.
+    ```
+    sudo apt-get install jq
+    ```
+## 2. How to Set Up
+### Step 1: Prepare the Script and Configuration File
+1. Copy the script:
+- Save the `transfer_and_delete_files.sh` script to a desired directory, e.g., `/home/liam/scripts/`.
+- Ensure the script is executable:
+    ```
+    chmod +x /home/liam/scripts/transfer_and_delete_files.sh
+    ```
+2. Prepare the JSON configuration file:
+- Save the `config.json` file in the same directory as the script, or modify the script to point to its location:
+    ```
+    CONFIG_FILE="/path/to/config.json"
+    ```
+### Step 2: Verify Configuration File
+Update the config.json file with your specific FTP servers and file details:
+
+- FTP_HOST: The Tailscale IP address.
+- FTP_PORT: Typically 21 for standard FTP connections.
+- FTP_USER and FTP_PASS: Credentials for the FTP server.
+- SERVER_DIR: Directory path on the FTP server where the file is located.
+- DATABASEFILENAME: Name of the file to transfer.
+- COPY_DESTINATION_DIR: Local directory where the file should be stored.
+
+Example:
+```
+{
+  "configurations": [
+    {
+      "FTP_HOST": "ftp.example.com",
+      "FTP_PORT": 21,
+      "FTP_USER": "username",
+      "FTP_PASS": "password",
+      "SERVER_DIR": "/remote/path",
+      "DATABASEFILENAME": "example_file.zip",
+      "COPY_DESTINATION_DIR": "/local/path"
+    }
+  ]
+}
+```
+
+### Step 3: Create the Log File
+The script writes logs to `/home/liam/transfer_and_delete_files.log`. Ensure the directory exists or modify the `LOG_FILE` variable in the script.
+
+## 3. How to Run the Shell Script
+### Run the Script
+1. Open a terminal and navigate to the script's directory:
+    ```
+    cd /home/liam/scripts/
+    ```
+2. Execute the script:
+    ```
+    ./transfer_and_delete_files.sh
+    ```
+
+## 4. How It Works
+1. Script Execution:
+   - The script reads each configuration from config.json.
+   - For each configuration:
+     -  Connects to the FTP server using lftp.
+     -  Checks if the specified file exists in the SERVER_DIR.
+     -  If found:
+        - Downloads the file to the COPY_DESTINATION_DIR.
+        - Deletes the file from the FTP server after a successful transfer.
+   - Logs all activities and errors to /home/liam/transfer_and_delete_files.log.
+2. Logs:
+    - The script records each operation and its status in a log file for easy tracking and debugging.
+
+## Code
+1. transfer_and_delete_files.sh
+```
+#!/bin/bash
+
+# JSON Configuration File
+CONFIG_FILE="config.json"
+
+# Log file
+LOG_FILE="/home/liam/transfer_and_delete_files.log"
+
+# Log and handle errors
+log_error() {
+  local message="$1"
+  echo "$(date): ERROR - $message" | tee -a $LOG_FILE
+}
+
+log_info() {
+  local message="$1"
+  echo "$(date): INFO - $message" | tee -a $LOG_FILE
+}
+
+# Function to check FTP connection
+check_connection() {
+  lftp -d -u $FTP_USER,$FTP_PASS ftp://$FTP_HOST:$FTP_PORT << EOF
+  bye
+EOF
+  if [ $? -ne 0 ]; then
+    log_error "Failed to establish connection to FTP server $FTP_HOST on port $FTP_PORT."
+    return 1
+  else
+    log_info "Successfully connected to FTP server $FTP_HOST."
+    return 0
+  fi
+}
+
+# Loop through each configuration in the JSON file
+jq -c '.configurations[]' "$CONFIG_FILE" | while read -r config; do
+  # Extract configuration values using jq
+  FTP_HOST=$(echo "$config" | jq -r '.FTP_HOST')
+  FTP_PORT=$(echo "$config" | jq -r '.FTP_PORT')
+  FTP_USER=$(echo "$config" | jq -r '.FTP_USER')
+  FTP_PASS=$(echo "$config" | jq -r '.FTP_PASS')
+  SERVER_DIR=$(echo "$config" | jq -r '.SERVER_DIR')
+  DATABASEFILENAME=$(echo "$config" | jq -r '.DATABASEFILENAME')
+  COPY_DESTINATION_DIR=$(echo "$config" | jq -r '.COPY_DESTINATION_DIR')
+
+  # Log configuration details
+  log_info "Processing configuration for $FTP_HOST:"
+  # log_info "FTP_HOST: $FTP_HOST"
+  # log_info "FTP_PORT: $FTP_PORT"
+  # log_info "FTP_USER: $FTP_USER"
+  # log_info "SERVER_DIR: $SERVER_DIR"
+  # log_info "DATABASEFILENAME: $DATABASEFILENAME"
+  # log_info "COPY_DESTINATION_DIR: $COPY_DESTINATION_DIR"
+
+  # Verify connection to the FTP server
+  check_connection
+  if [ $? -ne 0 ]; then
+    log_error "Skipping processing for $FTP_HOST due to connection failure."
+    continue
+  fi
+
+  # Check if the file exists on the FTP server
+  log_info "Checking if file '$DATABASEFILENAME' exists in $SERVER_DIR on $FTP_HOST..."
+  FILE_EXISTS=$(lftp -d -u $FTP_USER,$FTP_PASS ftp://$FTP_HOST:$FTP_PORT << EOF
+  set ssl:verify-certificate no
+  cd $SERVER_DIR
+  cls -1 | grep -F "$DATABASEFILENAME"
+  bye
+EOF
+  )
+
+  if [ -n "$FILE_EXISTS" ]; then
+    log_info "File '$DATABASEFILENAME' exists. Starting transfer to $COPY_DESTINATION_DIR..."
+
+    # Transfer the file to the destination directory
+    lftp -d -u $FTP_USER,$FTP_PASS ftp://$FTP_HOST:$FTP_PORT << EOF | tee -a $LOG_FILE
+    set ssl:verify-certificate no
+    cd $SERVER_DIR
+    get "$DATABASEFILENAME" -o "$COPY_DESTINATION_DIR/$DATABASEFILENAME"
+    bye
+EOF
+
+    # Check if the transfer was successful
+    if [ $? -eq 0 ]; then
+      log_info "Transfer of '$DATABASEFILENAME' successful."
+
+      # Delete the file from the FTP server
+      log_info "Deleting '$DATABASEFILENAME' from $SERVER_DIR on $FTP_HOST..."
+      lftp -d -u $FTP_USER,$FTP_PASS ftp://$FTP_HOST:$FTP_PORT << EOF | tee -a $LOG_FILE
+      set ssl:verify-certificate no
+      cd $SERVER_DIR
+      rm "$DATABASEFILENAME"
+      bye
+EOF
+
+      if [ $? -eq 0 ]; then
+        log_info "File '$DATABASEFILENAME' deleted successfully from $SERVER_DIR."
+      else
+        log_error "Failed to delete '$DATABASEFILENAME' from $SERVER_DIR."
+      fi
+    else
+      log_error "Transfer of '$DATABASEFILENAME' failed."
+    fi
+  else
+    log_info "File '$DATABASEFILENAME' does not exist in $SERVER_DIR."
+  fi
+done
+
+```
+
+2. config.json
+```
+{
+    "configurations": [
+      {
+        "FTP_HOST": "Tailscale_IP_Address",
+        "FTP_PORT": 21,
+        "FTP_USER": "server1",
+        "FTP_PASS": "server1pass",
+        "SERVER_DIR": "/DatabaseBackup1",
+        "DATABASEFILENAME": "10_28_2024_Cambio_Database.zip",
+        "COPY_DESTINATION_DIR": "/home/liam/Desktop/NAS_Folder"
+      },
+      {
+        "FTP_HOST": "Tailscale_IP_Address",
+        "FTP_PORT": 21,
+        "FTP_USER": "server2",
+        "FTP_PASS": "server2pass",
+        "SERVER_DIR": "/DatabaseBackup2",
+        "DATABASEFILENAME": "7_7_2024_Cambio_Database.zip",
+        "COPY_DESTINATION_DIR": "/home/liam/Desktop/NAS_Folder"
+      },
+      {
+        "FTP_HOST": "Tailscale_IP_Address",
+        "FTP_PORT": 21,
+        "FTP_USER": "server2",
+        "FTP_PASS": "server2pass",
+        "SERVER_DIR": "/DatabaseBackup2",
+        "DATABASEFILENAME": "7_7_2024_Cambio_Database.zip",
+        "COPY_DESTINATION_DIR": "/home/liam/Desktop/NAS_Folder"
+      }
+    ]
+  }
+```
+
+# FTP File Download Script
+
+This script connects to FTP servers, processes specific folders, and downloads files to a local directory. It uses `ftplib` for FTP communication, `os` for local directory handling, and `json` for reading configuration files.
+
+## Requirements
+
+- Python 3.x (tested with Python 3.8)
+- Libraries:
+  - `ftplib` (Standard Python library for FTP connections)
+  - `os` (Standard Python library for file and directory operations)
+  - `json` (Standard Python library for parsing JSON data)
+
+These libraries are part of Python's standard library, so no external dependencies are required.
+
+## Installation
+
+1. **Clone the repository** or download the script.
+2. Ensure you have **Python 3.x** installed.
+3. Since the libraries are part of Python's standard library, no additional installation steps are necessary.
+
+## Configuration
+
+### Configuration File (`config.json`)
+
+The script requires a `config.json` file to configure the FTP servers and directories from which files should be downloaded. Below is an example of the configuration format:
+
+```json
+{
+  "servers": [
+    {
+      "ftp_host": "ftp.example.com",
+      "ftp_port": 21,
+      "ftp_username": "your_username",
+      "ftp_password": "your_password",
+      "folders_to_download": [
+        {
+          "remote_folder": "/remote/folder/path",
+          "folder_mask": "*.txt"
+        }
+      ]
+    }
+  ]
+}
+```
+## Explanation
+- `ftp_host:` The host address of the FTP server.
+- `ftp_port:` The port to connect to (default FTP port is 21).
+- `ftp_username:` The FTP username.
+- `folders_to_download:` A list of folders to be processed, each containing:
+    - `remote_folder:` The remote folder to access.
+    - `folder_mask:` The mask to filter files (e.g., *.zip).
+
+
+## Local Directory
+
+The script will download files to a local directory. The default download directory is:
+
+- F:\FTP File Transfer\NAS-folder
+  - This path can be changed by modifying the DOWNLOAD_DIR variable in the script
+
+## USAGE
+1. Modify the config.json file with the correct FTP server details.
+2. Run the script with Python:
+   ```python
+   python FileTransfer.py
+   ```
+The script will connect to the FTP servers, navigate to the specified folders, and download the files matching the given `folder_mask.`
+
+## Expected Output
+
+The script will:
+- Read the FTP server configuration from `config.json.`
+- Connect to each FTP server listed in the configuration.
+- Access the specified folders and download files that match the given filter (e.g., `*.zip`).
+- Display progress for each file being downloaded, like so:
+![alt text](../img/output.PNG)
+
+## Check the Downloaded Files
+
+After the script finishes running, check the specified download directory for the downloaded files, which will be saved in folders named `Server <index>` based on the order of the servers in the `config.json` file.
+
+``` Python
+import ftplib
+import os
+import json
+
+# Base directory for downloads
+DOWNLOAD_DIR = r"F:\FTP File Transfer\NAS-folder"
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+
+def connect_to_ftp(server_config):
+    """Establish an FTP connection."""
+    try:
+        ftp = ftplib.FTP(timeout=30)
+        ftp.connect(server_config['ftp_host'], server_config['ftp_port'])
+        ftp.login(server_config['ftp_username'], server_config['ftp_password'])
+        print(f"Connected to {server_config['ftp_host']}.")
+        return ftp
+    except ftplib.all_errors as e:
+        print(f"FTP connection error: {e}")
+        return None
+
+
+def download_file(ftp, filename, local_folder):
+    """Download a single file from the FTP server."""
+    local_filepath = os.path.join(local_folder, filename)
+    try:
+         # Get the file size for progress reporting
+        file_size = ftp.size(filename)
+        print(f"Downloading: {filename} ({file_size / (1024 * 1024):.2f} MB)")
+
+        downloaded_size = 0
+
+        def progress_callback(data):
+            # Callback to write data to the file and show progress
+            nonlocal downloaded_size
+            with open(local_filepath, 'ab') as f:
+                f.write(data)
+            downloaded_size += len(data)
+            print(f"\rProgress: {downloaded_size / file_size:.2%}", end="")
+
+         # Download the file in binary mode
+        ftp.retrbinary(f"RETR {filename}", progress_callback)
+        print(f"\nDownloaded {filename} to {local_filepath}.")
+    except ftplib.all_errors as e:
+        print(f"Error downloading file {filename}: {e}")
+
+
+def process_folder(ftp, folder, server_index):
+    """Process a specific folder on the FTP server."""
+
+    remote_folder = folder['remote_folder']
+    local_folder = os.path.join(DOWNLOAD_DIR, f"Server {server_index}", remote_folder)
+    os.makedirs(local_folder, exist_ok=True)
+
+    try:
+        # Navigate to the specified remote folder
+        ftp.cwd(remote_folder)
+        print(f"Accessing folder: {remote_folder}")
+
+         # Get a list of matching files based on the folder mask
+        files = [
+            name for name, _ in ftp.mlsd()
+            if folder.get('folder_mask', '').lower() in name.lower()
+        ]
+
+        if not files:
+            print(f"No matching files in {remote_folder}")
+            return
+
+        # Download the first matching file
+        download_file(ftp, files[0], local_folder)
+    except ftplib.error_perm as e:
+        print(f"Permission error accessing {remote_folder}: {e}")
+    except Exception as e:
+        print(f"Error processing folder {remote_folder}: {e}")
+
+
+def process_server(server_config, server_index):
+    """Process a specific server."""
+    print(f"Processing Server {server_index}: {server_config['ftp_host']}")
+
+    # Connect to the FTP server
+    ftp = connect_to_ftp(server_config)
+    if not ftp:
+        return
+
+    try:
+         # Process the first folder in the server configuration
+        folder = server_config['folders_to_download'][0]  # Only one folder per server
+        process_folder(ftp, folder, server_index)
+
+        # Print the separator after each server's folder has been processed
+        print("\n=======================================================")
+    finally:
+        # Ensure the FTP connection is closed
+        ftp.quit()
+
+
+def main():
+    """Main script logic."""
+
+    # Load server configuration from a JSON file
+    with open("config.json", 'r') as f:
+        config = json.load(f)
+
+    # Process each server in the configuration
+    for index, server_config in enumerate(config['servers'], start=1):
+        process_server(server_config, index)
+
+    print("All server processing completed.")
+
+
+if __name__ == "__main__":
+    main()
+
+```
     
+```
+config.json
+{
+    "servers": [
+        {
+            "ftp_host": "Tailscale_IP",
+            "ftp_port": 21,
+            "ftp_username": "user1",
+            "ftp_password": "Developer14!",
+            "folders_to_download": [
+                {
+                    "remote_folder": "Database/Cambio",
+                    "folder_mask": "11_21_2024_Cambio_database.zip"
+                }
+            ]
+        },
+        {
+            "ftp_host": "Tailscale_IP",
+            "ftp_port": 21,
+            "ftp_username": "CambioServer",
+            "ftp_password": "bravo99",
+            "folders_to_download": [
+                {
+                    "remote_folder": "Database/Inspire",
+                    "folder_mask": "08_03_2024_Inspire_Database.zip"
+                }
+            ]
+        },
+        {
+            "ftp_host": "Tailscale_IP",
+            "ftp_port": 21,
+            "ftp_username": "server3",
+            "ftp_password": "server3pass",
+            "folders_to_download": [
+                {
+                    "remote_folder": "Database/Lakeshore",
+                    "folder_mask": "7_7_2024_Lakeshore_Database.zip"
+                }
+            ]
+        }
+    ]
+}
+```
