@@ -29,7 +29,7 @@ from openai import OpenAI
 import os
 import json
 
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "sk-ptw-bSv7ViSdzZhD9nemGyj2T3BlbkFJOPvsQvhpy7v7yWVme3DR"))
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "OPEN_AI_KEY_HERE"))
 
 """## 2. An example chat completion API call
 
